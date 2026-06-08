@@ -1,0 +1,22 @@
+{
+  "name": "Tredy – Fashion Store",
+  "short_name": "Tredy",
+  "description": "Manage your fashion store as Mia — serve customers, sort clothing, handle deliveries!",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#1a0a14",
+  "theme_color": "#c0357a",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='36' fill='%23c0357a'/><text x='96' y='132' font-family='serif' font-size='100' fill='%23fff' text-anchor='middle'>👗</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='96' fill='%23c0357a'/><text x='256' y='360' font-family='serif' font-size='280' fill='%23fff' text-anchor='middle'>👗</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<title>Tredy – Fashion Store</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%23c0357a'/><text x='32' y='44' font-family='serif' font-size='30' fill='%23fff' text-anchor='middle'>👗</text></svg>">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --pink:#e83e8c;--rose:#f9c;--gold:#f0c040;--cream:#fff8f0;
+  --floor:#c8a87a;--wall:#f5e8d0;--rack1:#e74c3c;--rack2:#2980b9;
+  --rack3:#27ae60;--rack4:#8e44ad;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:#1a0a14;font-family:'Georgia',serif}
+canvas{display:block;touch-action:none}
+#ui{position:fixed;top:0;left:0;right:0;z-index:10;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:6px 14px;background:rgba(20,0,15,0.82);pointer-events:none}
+#ui-score{color:var(--gold);font-size:1.1rem;font-weight:700;text-shadow:0 0 8px var(--gold)}
+#ui-msg{color:#f9e;font-size:0.78rem;text-align:center;flex:1;padding:0 10px;
+  min-height:1.2em;text-shadow:0 0 6px #e83e8c}
+#ui-level{color:#b9f;font-size:0.85rem;font-weight:600}
+
+/* Mobile controls */
+#ctrl{position:fixed;bottom:0;left:0;right:0;z-index:10;
+  display:none;height:140px;pointer-events:none;
+  padding:10px 20px 24px}
+#joy-base{position:absolute;left:24px;bottom:24px;
+  width:96px;height:96px;border-radius:50%;
+  background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.25);
+  pointer-events:all;touch-action:none}
+#joy-knob{position:absolute;width:38px;height:38px;border-radius:50%;
+  background:rgba(240,180,220,0.7);border:2px solid rgba(255,200,230,0.9);
+  top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+#btn-action{position:absolute;right:24px;bottom:24px;
+  width:80px;height:80px;border-radius:50%;
+  background:radial-gradient(circle,#e83e8c,#a02060);
+  border:3px solid #f9c;font-size:1.6rem;color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:all;touch-action:none;user-select:none;
+  box-shadow:0 0 16px rgba(232,62,140,0.6)}
+#btn-action:active{transform:scale(0.92)}
+@media(pointer:coarse){#ctrl{display:block}}
+
+/* Splash / overlay */
+#splash{position:fixed;inset:0;z-index:50;
+  background:linear-gradient(160deg,#1a0a14 0%,#2d1035 50%,#1a0a14 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;color:var(--cream);text-align:center;padding:24px}
+#splash h1{font-size:clamp(2rem,7vw,3.4rem);color:var(--gold);
+  text-shadow:0 0 20px var(--gold),0 0 40px rgba(240,192,64,0.4)}
+#splash p{font-size:0.9rem;color:#e8c8d8;max-width:360px;line-height:1.6}
+#splash button{padding:14px 36px;border-radius:30px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--pink),#a02060);color:#fff;
+  font-size:1rem;font-weight:700;font-family:inherit;
+  box-shadow:0 0 24px rgba(232,62,140,0.5);transition:all 0.2s}
+#splash button:hover{transform:scale(1.05)}
+.star{position:absolute;animation:twinkle 2s ease-in-out infinite}
+@keyframes twinkle{0%,100%{opacity:0.3;transform:scale(0.8)}50%{opacity:1;transform:scale(1.2)}}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div class="star" style="top:8%;left:12%;font-size:1.4rem;animation-delay:0s">✨</div>
+  <div class="star" style="top:15%;right:10%;font-size:1rem;animation-delay:0.4s">⭐</div>
+  <div class="star" style="bottom:20%;left:8%;font-size:0.9rem;animation-delay:0.8s">✨</div>
+  <div class="star" style="bottom:30%;right:14%;font-size:1.2rem;animation-delay:1.2s">⭐</div>
+  <h1>✨ Tredy ✨</h1>
+  <p>Du bist Mia, Verkäuferin im schönsten Modeladen der Stadt. Berate Stammkundinnen, halte die Kleiderstangen in Ordnung und lasse die Managerin nicht warten!</p>
+  <div style="font-size:0.8rem;color:#c8a0b8;line-height:1.8">
+    🕹️ Desktop: Pfeiltasten + Leertaste<br>
+    📱 Mobile: Joystick + Aktions-Button
+  </div>
+  <button id="btn-start">Los geht's! 🛍️</button>
+</div>
+
+<div id="ui">
+  <span id="ui-score">💰 0</span>
+  <span id="ui-msg"></span>
+  <span id="ui-level">Level 1</span>
+</div>
+<canvas id="c"></canvas>
+<div id="ctrl">
+  <div id="joy-base"><div id="joy-knob"></div></div>
+  <div id="btn-action">👗</div>
+</div>
+
+<script>
+'use strict';
+// ── Canvas setup ─────────────────────────────────────────────────────────────
+const cv=document.getElementById('c');
+const cx=cv.getContext('2d');
+let W,H,SCALE=1;
+const DESIGN_W=800,DESIGN_H=500;
+
+function resize(){
+  const vw=window.innerWidth,vh=window.innerHeight;
+  SCALE=Math.min(vw/DESIGN_W,vh/DESIGN_H);
+  cv.width=Math.round(DESIGN_W*SCALE);
+  cv.height=Math.round(DESIGN_H*SCALE);
+  cv.style.width=cv.width+'px';
+  cv.style.height=cv.height+'px';
+  cv.style.display='block';
+  cv.style.margin='auto';
+  W=DESIGN_W;H=DESIGN_H;
+}
+window.addEventListener('resize',resize);
+resize();
+
+// ── Game state ───────────────────────────────────────────────────────────────
+const ST={SPLASH:'splash',PLAY:'play',OVER:'over'};
+let state=ST.SPLASH,score=0,level=1,frame=0,shakeT=0;
+let msgText='',msgTimer=0;
+
+function msg(t,dur=180){msgText=t;msgTimer=dur;}
+function uiMsg(t){document.getElementById('ui-msg').textContent=t;}
+function uiScore(){document.getElementById('ui-score').textContent='💰 '+score;}
+function uiLevel(){document.getElementById('ui-level').textContent='Level '+level;}
+
+// ── Layout constants ──────────────────────────────────────────────────────────
+const FLOOR_Y=H-90;          // floor surface
+const MIA_W=28,MIA_H=56;
+const RACK_Y=FLOOR_Y-120;     // top of clothing rack
+const RACK_H=100;
+const RACK_W=90;
+// X positions
+const DRESSING_X=40;          // dressing room left wall
+const RACK1_X=150;            // rack positions (centre)
+const RACK2_X=270;
+const COUNTER_X=400;          // counter centre
+const RACK3_X=530;
+const RACK4_X=650;
+const DOOR_X=750;             // glass door
+
+// 4 rack colours
+const RACK_COLS=['#e74c3c','#2980b9','#27ae60','#8e44ad'];
+const RACK_NAMES=['Rot','Blau','Grün','Lila'];
+const RACK_XS=[RACK1_X,RACK2_X,RACK3_X,RACK4_X];
+
+// ── Clothing items ────────────────────────────────────────────────────────────
+// Each item has { id, rack (0-3), x, y, hanging:bool, carriedBy, misplaced }
+let items=[];
+let nextItemId=0;
+function makeItem(rack,x,y){
+  return{id:nextItemId++,rack,x,y,hanging:true,carriedBy:null,misplaced:false};
+}
+function initItems(){
+  items=[];
+  for(let r=0;r<4;r++){
+    for(let i=0;i<4;i++){
+      items.push(makeItem(r,RACK_XS[r]+(i-1.5)*16,RACK_Y+10));
+    }
+  }
+}
+
+// ── Mia (player) ─────────────────────────────────────────────────────────────
+const mia={
+  x:COUNTER_X,y:FLOOR_Y,vx:0,
+  speed:2.8,dir:1,
+  carrying:[],   // item ids
+  maxCarry:3,
+  talking:null,  // actor id
+  talkTimer:0,
+  blinkT:0,animT:0
+};
+
+// ── Actors ───────────────────────────────────────────────────────────────────
+let actors=[];
+let nextActorId=0;
+const ACT={
+  WEIBERGRUPPE:'weibergruppe',
+  STAMMKUNDIN:'stammkundin',
+  POSTBOTE:'postbote',
+  MANAGEMENT:'management'
+};
+
+// Spawn timers
+let spawnTimer=300,spawnMin=200,spawnMax=500;
+
+// ── Packages ─────────────────────────────────────────────────────────────────
+let packages=[];  // {x,y,rack,items:[item ids],opened:bool}
+
+// ── Spawn logic ───────────────────────────────────────────────────────────────
+function spawnActor(){
+  const types=[ACT.WEIBERGRUPPE,ACT.STAMMKUNDIN,ACT.STAMMKUNDIN,ACT.POSTBOTE,ACT.MANAGEMENT];
+  const t=types[Math.floor(Math.random()*types.length)];
+  const fromRight=Math.random()>0.4;
+  const x=fromRight?DOOR_X+20:-30;
+  const dir=fromRight?-1:1;
+
+  const STAMM_NAMES=['Brigitte','Karin','Uschi'];
+  const STAMM_COLS=['#e8a0b0','#a0c8e8','#c8e8a0'];
+  const STAMM_LIKES=[0,1,2];
+
+  if(t===ACT.WEIBERGRUPPE){
+    actors.push({id:nextActorId++,type:t,x,y:FLOOR_Y,dir,speed:1.4,
+      state:'enter',timer:0,phase:0,
+      members:[{dx:-22},{dx:0},{dx:22}],
+      chaosCooldown:0,label:'👩‍👩‍👧'});
+  } else if(t===ACT.STAMMKUNDIN){
+    const si=Math.floor(Math.random()*3);
+    actors.push({id:nextActorId++,type:t,x,y:FLOOR_Y,dir,speed:1.6,
+      state:'browsing',timer:0,phase:0,
+      name:STAMM_NAMES[si],col:STAMM_COLS[si],
+      prefRack:STAMM_LIKES[si],
+      items:[],maxItems:3+Math.floor(Math.random()*3),
+      waitAtCounter:0,label:'👩'});
+  } else if(t===ACT.POSTBOTE){
+    actors.push({id:nextActorId++,type:t,x:-40,y:FLOOR_Y,dir:1,speed:1.2,
+      state:'enter',timer:0,phase:0,
+      pkgCount:2+Math.floor(Math.random()*3),
+      delivered:false,label:'📦',
+      happy:false,helpTimer:0});
+  } else if(t===ACT.MANAGEMENT){
+    actors.push({id:nextActorId++,type:t,x:DOOR_X+30,y:FLOOR_Y,dir:-1,speed:1.0,
+      state:'enter',timer:0,phase:0,
+      inspecting:false,inspectTimer:0,label:'👔'});
+  }
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+const K={};
+document.addEventListener('keydown',e=>{K[e.code]=true;
+  if(e.code==='Space')doAction();
+  if(['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();
+});
+document.addEventListener('keyup',e=>{K[e.code]=false;});
+
+// Touch joystick
+let joyActive=false,joyDx=0;
+const joyBase=document.getElementById('joy-base');
+const joyKnob=document.getElementById('joy-knob');
+(function(){
+  let startX=0,startY=0,activeId=null;
+  const br=48;
+  function upd(cx2,cy2){
+    const rect=joyBase.getBoundingClientRect();
+    const bx=rect.left+rect.width/2,by=rect.top+rect.height/2;
+    const dx=cx2-bx,dy=cy2-by;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    const r=Math.min(dist,br*0.7);
+    const a=Math.atan2(dy,dx);
+    joyKnob.style.transform=`translate(calc(-50% + ${Math.cos(a)*r}px),calc(-50% + ${Math.sin(a)*r}px))`;
+    joyDx=dist>br*0.2?dx/dist:0;
+  }
+  joyBase.addEventListener('touchstart',e=>{
+    e.preventDefault();const t=e.changedTouches[0];
+    activeId=t.identifier;joyActive=true;upd(t.clientX,t.clientY);
+  },{passive:false});
+  joyBase.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    for(const t of e.changedTouches)if(t.identifier===activeId)upd(t.clientX,t.clientY);
+  },{passive:false});
+  joyBase.addEventListener('touchend',e=>{
+    for(const t of e.changedTouches)if(t.identifier===activeId){
+      joyActive=false;joyDx=0;joyKnob.style.transform='translate(-50%,-50%)';activeId=null;
+    }
+  },{passive:false});
+})();
+
+document.getElementById('btn-action').addEventListener('touchstart',e=>{
+  e.preventDefault();doAction();
+},{passive:false});
+
+// Fullscreen on first touch
+document.addEventListener('touchstart',function fs(){
+  const el=document.documentElement;
+  if(el.requestFullscreen)el.requestFullscreen({navigationUI:'hide'}).catch(()=>{});
+  else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
+  document.removeEventListener('touchstart',fs);
+},{once:true,passive:true});
+
+// ── Action logic ──────────────────────────────────────────────────────────────
+function nearX(ax,bx,d){return Math.abs(ax-bx)<d;}
+
+function doAction(){
+  if(state!==ST.PLAY)return;
+
+  // 1. Talk to nearby actor
+  for(const a of actors){
+    if(nearX(mia.x,a.x,55)&&!mia.talking){
+      mia.talking=a.id;mia.talkTimer=180;
+      onTalk(a);
+      return;
+    }
+  }
+
+  // 2. Pick up item from rack
+  if(mia.carrying.length<mia.maxCarry){
+    for(const item of items){
+      if(!item.hanging||item.carriedBy!=null)continue;
+      const rx=RACK_XS[item.rack];
+      if(nearX(mia.x,rx,55)){
+        item.hanging=false;item.carriedBy='mia';
+        mia.carrying.push(item.id);
+        msg('👗 Aufgenommen!',60);
+        return;
+      }
+    }
+  }
+
+  // 3. Hang item on rack
+  if(mia.carrying.length>0){
+    for(let r=0;r<4;r++){
+      if(nearX(mia.x,RACK_XS[r],55)){
+        const itemId=mia.carrying[0];
+        const item=items.find(i=>i.id===itemId);
+        if(item){
+          item.hanging=true;item.carriedBy=null;
+          item.x=RACK_XS[r]+(Math.random()-0.5)*40;
+          item.y=RACK_Y+10+Math.random()*20;
+          item.rack=r; // reassign to this rack
+          item.misplaced=false; // correct rack
+          mia.carrying.splice(0,1);
+          msg('✅ Einsortiert!',60);
+          score+=2;uiScore();
+        }
+        return;
+      }
+    }
+  }
+
+  // 4. Open package
+  for(const pkg of packages){
+    if(!pkg.opened&&nearX(mia.x,pkg.x,60)){
+      pkg.opened=true;
+      for(const iid of pkg.items){
+        const item=items.find(i=>i.id===iid);
+        if(item){item.x=pkg.x+(Math.random()-0.5)*40;item.y=pkg.y-20;item.hanging=false;item.carriedBy=null;}
+      }
+      msg('📦 Paket geöffnet!',90);
+      return;
+    }
+  }
+
+  // 5. Pay customer at counter
+  for(const a of actors){
+    if(a.type===ACT.STAMMKUNDIN&&a.state==='waiting'&&nearX(mia.x,COUNTER_X,60)){
+      const rev=a.items.length*15;
+      score+=rev;uiScore();
+      msg(`💳 ${a.name} zahlt ${rev}€!`,180);
+      // remove items sold
+      a.items.forEach(iid=>{const idx=items.findIndex(i=>i.id===iid);if(idx>=0)items.splice(idx,1);});
+      // replenish
+      for(let n=0;n<a.items.length;n++){
+        const r=Math.floor(Math.random()*4);
+        items.push(makeItem(r,RACK_XS[r]+(Math.random()-0.5)*50,RACK_Y+10));
+      }
+      a.state='leave';a.timer=60;
+      return;
+    }
+  }
+}
+
+function onTalk(a){
+  if(a.type===ACT.STAMMKUNDIN){
+    msg(`💬 "${a.name}: Oh, ich nehme das und das!"`,120);
+    if(a.state==='browsing'){a.state='goingToDress';}
+  } else if(a.type===ACT.WEIBERGRUPPE){
+    msg('🗣️ "Haha, schau mal das hier!" – etwas Ruhe kehrt ein',120);
+    a.chaosCooldown=300;
+  } else if(a.type===ACT.POSTBOTE){
+    msg('📦 Syrischer Postbote: "Salamu alaikum! Ich helfe gerne!"',150);
+    a.happy=true;a.helpTimer=200;
+  } else if(a.type===ACT.MANAGEMENT){
+    msg('👔 Management: "Ich hoffe alles ist in Ordnung hier!"',120);
+  }
+}
+
+// ── Game update ───────────────────────────────────────────────────────────────
+function countMisplaced(){
+  let n=0;
+  for(const item of items){
+    if(item.hanging&&item.misplaced)n++;
+  }
+  return n;
+}
+function countUnopened(){return packages.filter(p=>!p.opened).length;}
+
+function update(){
+  frame++;
+  if(shakeT>0)shakeT--;
+  if(msgTimer>0)msgTimer--;
+  else if(!msgText)uiMsg('');
+  if(msgTimer===0&&msgText){uiMsg(msgText);msgText='';}
+
+  // Mia movement
+  let dx=0;
+  if(K['ArrowLeft'])dx=-1;
+  if(K['ArrowRight'])dx=1;
+  if(joyActive&&Math.abs(joyDx)>0.15)dx=joyDx;
+  mia.vx=dx*mia.speed;
+  mia.x=Math.max(20,Math.min(W-20,mia.x+mia.vx));
+  if(dx!==0)mia.dir=dx>0?1:-1;
+  mia.animT=frame;
+  mia.blinkT++;
+
+  // Talk timer
+  if(mia.talkTimer>0){mia.talkTimer--;if(mia.talkTimer===0)mia.talking=null;}
+
+  // Spawn
+  spawnTimer--;
+  if(spawnTimer<=0&&actors.length<5){
+    spawnActor();
+    spawnTimer=spawnMin+Math.floor(Math.random()*(spawnMax-spawnMin));
+    if(level>3)spawnTimer=Math.max(120,spawnTimer-level*20);
+  }
+
+  // Update actors
+  for(let ai=actors.length-1;ai>=0;ai--){
+    const a=actors[ai];
+    updateActor(a);
+    if(a.state==='done')actors.splice(ai,1);
+  }
+
+  // Level up
+  if(score>level*200){level++;uiLevel();spawnMin=Math.max(80,spawnMin-20);msg(`⭐ Level ${level}!`,180);}
+}
+
+function updateActor(a){
+  a.timer++;
+  if(a.type===ACT.WEIBERGRUPPE) updateWeibergruppe(a);
+  else if(a.type===ACT.STAMMKUNDIN) updateStammkundin(a);
+  else if(a.type===ACT.POSTBOTE) updatePostbote(a);
+  else if(a.type===ACT.MANAGEMENT) updateManagement(a);
+}
+
+function updateWeibergruppe(a){
+  if(a.state==='enter'){
+    a.x+=a.dir*a.speed;
+    if(nearX(a.x,RACK1_X,30)||nearX(a.x,RACK2_X,30)){a.state='chaos';a.timer=0;}
+  }
+  if(a.state==='chaos'){
+    if(a.chaosCooldown>0){a.chaosCooldown--;return;}
+    // Every 80 frames, displace a random item
+    if(a.timer%80===0){
+      const rackItems=items.filter(i=>i.hanging&&(nearX(i.x,RACK1_X,60)||nearX(i.x,RACK2_X,60)));
+      if(rackItems.length>0){
+        const item=rackItems[Math.floor(Math.random()*rackItems.length)];
+        // move to wrong rack
+        const wrongRack=(item.rack+1+Math.floor(Math.random()*3))%4;
+        item.rack=wrongRack;
+        item.x=RACK_XS[wrongRack]+(Math.random()-0.5)*40;
+        item.misplaced=true;
+        msg('👩‍👩‍👧 Chaos an der Kleiderstange!',90);
+      }
+    }
+    if(a.timer>360){a.state='leave';a.timer=0;}
+  }
+  if(a.state==='leave'){
+    a.x+=1.5*(a.dir*-1);
+    if(a.x<-60||a.x>W+60)a.state='done';
+  }
+}
+
+function updateStammkundin(a){
+  const targetRack=RACK_XS[a.prefRack];
+  if(a.state==='browsing'){
+    // Walk to preferred rack
+    const dx=targetRack-a.x;
+    if(Math.abs(dx)>5){a.x+=Math.sign(dx)*a.speed;a.dir=Math.sign(dx);}
+    else{
+      // Pick items
+      if(a.timer%60===0&&a.items.length<a.maxItems){
+        const avail=items.filter(i=>i.hanging&&i.carriedBy==null&&Math.abs(i.x-a.x)<80);
+        if(avail.length>0){
+          const item=avail[Math.floor(Math.random()*avail.length)];
+          item.hanging=false;item.carriedBy=a.id;
+          a.items.push(item.id);
+          // Occasionally misplace one back
+          if(Math.random()<0.2&&a.items.length>1){
+            const putBack=a.items.splice(0,1)[0];
+            const itm=items.find(i=>i.id===putBack);
+            if(itm){
+              const wrongR=(itm.rack+1)%4;
+              itm.hanging=true;itm.carriedBy=null;
+              itm.x=RACK_XS[wrongR]+(Math.random()-0.5)*30;
+              itm.misplaced=true;
+            }
+          }
+        }
+      }
+      if(a.items.length>=a.maxItems||(a.timer>300&&a.items.length>0)){
+        a.state='goingToDress';a.timer=0;
+        msg(`💃 ${a.name} geht in die Umkleidekabine!`,90);
+      }
+    }
+  }
+  if(a.state==='goingToDress'){
+    const dx=DRESSING_X+30-a.x;
+    if(Math.abs(dx)>5){a.x+=Math.sign(dx)*a.speed;a.dir=Math.sign(dx);}
+    else{a.state='dressing';a.timer=0;}
+  }
+  if(a.state==='dressing'){
+    if(a.timer>200){a.state='goingToCounter';a.timer=0;
+      msg(`🛍️ ${a.name} kommt zur Kasse!`,90);}
+  }
+  if(a.state==='goingToCounter'){
+    const dx=COUNTER_X-a.x;
+    if(Math.abs(dx)>5){a.x+=Math.sign(dx)*a.speed;a.dir=Math.sign(dx);}
+    else{a.state='waiting';a.waitAtCounter=0;a.timer=0;
+      msg(`💳 ${a.name} wartet an der Kasse!`,120);}
+  }
+  if(a.state==='waiting'){
+    a.waitAtCounter++;
+    if(a.waitAtCounter>360){
+      // Too long — leaves annoyed
+      score=Math.max(0,score-20);uiScore();shakeT=20;
+      msg(`😡 ${a.name} geht ohne zu kaufen!`,150);
+      a.items.forEach(iid=>{
+        const itm=items.find(i=>i.id===iid);
+        if(itm){itm.hanging=true;itm.carriedBy=null;
+          itm.x=RACK_XS[itm.rack]+(Math.random()-0.5)*40;itm.misplaced=Math.random()<0.4;}
+      });
+      a.state='leave';a.timer=0;
+    }
+  }
+  if(a.state==='leave'){
+    a.x+=2*(a.dir*-1);
+    if(a.x<-60||a.x>W+60)a.state='done';
+  }
+}
+
+function updatePostbote(a){
+  if(a.state==='enter'){
+    a.x+=a.dir*a.speed;
+    if(a.x>120){
+      a.state='deliver';a.timer=0;
+      // Spawn packages near counter
+      for(let p=0;p<a.pkgCount;p++){
+        const pkgItems=[];
+        for(let n=0;n<2;n++){
+          const r=Math.floor(Math.random()*4);
+          const newItem=makeItem(r,COUNTER_X+(p*30-30)+(Math.random()-0.5)*20,FLOOR_Y-20);
+          newItem.hanging=false;items.push(newItem);pkgItems.push(newItem.id);
+        }
+        packages.push({x:COUNTER_X-60+p*35,y:FLOOR_Y-10,rack:Math.floor(Math.random()*4),items:pkgItems,opened:false});
+      }
+      msg('📦 Postbote bringt Pakete!',120);
+    }
+  }
+  if(a.state==='deliver'){
+    // Walk to counter
+    const dx=COUNTER_X-30-a.x;
+    if(Math.abs(dx)>5){a.x+=Math.sign(dx)*a.speed;a.dir=Math.sign(dx);}
+    else{a.state='waiting';a.timer=0;}
+  }
+  if(a.state==='waiting'){
+    // If talked to and happy, he helps sort one item every 120 frames
+    if(a.happy&&a.helpTimer>0){
+      a.helpTimer--;
+      if(a.timer%120===0){
+        const bad=items.filter(i=>i.hanging&&i.misplaced);
+        if(bad.length>0){
+          const itm=bad[0];
+          itm.misplaced=false;
+          itm.x=RACK_XS[itm.rack]+(Math.random()-0.5)*30;
+          msg('👨 Postbote hilft: Kleidung sortiert!',90);
+          score+=3;uiScore();
+        }
+      }
+    }
+    if(a.timer>300){a.state='leave';a.timer=0;}
+  }
+  if(a.state==='leave'){
+    a.x-=a.speed;
+    if(a.x<-60)a.state='done';
+  }
+}
+
+function updateManagement(a){
+  if(a.state==='enter'){
+    a.x+=a.dir*a.speed;
+    if(a.x<W-100){a.state='inspect';a.timer=0;a.inspectTimer=0;
+      msg('👔 Managerin betritt den Laden!',120);}
+  }
+  if(a.state==='inspect'){
+    // Walk around
+    const target=RACK_XS[Math.floor(a.inspectTimer/100)%4];
+    const dx=target-a.x;
+    if(Math.abs(dx)>5){a.x+=Math.sign(dx)*a.speed*0.8;a.dir=Math.sign(dx);}
+    a.inspectTimer++;
+    if(a.timer>400){
+      // Final verdict
+      const mis=countMisplaced();
+      const unop=countUnopened();
+      let penalty=0;
+      if(mis>0){penalty+=mis*10;msg(`👔 "${mis} Kleidungsstücke falsch! –${mis*10} Punkte!"`,180);}
+      if(unop>0){penalty+=unop*15;
+        setTimeout(()=>msg(`👔 "${unop} Pakete noch zu! –${unop*15} Punkte!"`,180),60);}
+      if(penalty===0){score+=30;uiScore();msg('👔 "Alles tadellos! +30 Bonus!"',180);}
+      else{score=Math.max(0,score-penalty);uiScore();shakeT=30;}
+      a.state='leave';a.timer=0;
+    }
+  }
+  if(a.state==='leave'){
+    a.x+=2;
+    if(a.x>W+60)a.state='done';
+  }
+}
+
+// ── Drawing ───────────────────────────────────────────────────────────────────
+function draw(){
+  cx.save();
+  cx.scale(SCALE,SCALE);
+  if(shakeT>0){
+    cx.translate(Math.random()*4-2,Math.random()*4-2);
+  }
+
+  drawStore();
+  drawItems();
+  drawPackages();
+  drawActors();
+  drawMia();
+  drawUI2D();
+
+  cx.restore();
+}
+
+function drawStore(){
+  // Wall
+  cx.fillStyle='#f5e8d5';cx.fillRect(0,0,W,FLOOR_Y);
+  // Floor
+  const fg=cx.createLinearGradient(0,FLOOR_Y,0,H);
+  fg.addColorStop(0,'#d4a86a');fg.addColorStop(1,'#b8824a');
+  cx.fillStyle=fg;cx.fillRect(0,FLOOR_Y,W,H-FLOOR_Y);
+  // Floor tiles
+  cx.strokeStyle='rgba(0,0,0,0.08)';cx.lineWidth=0.5;
+  for(let x=0;x<W;x+=40){cx.beginPath();cx.moveTo(x,FLOOR_Y);cx.lineTo(x,H);cx.stroke();}
+  for(let y=FLOOR_Y;y<H;y+=30){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();}
+
+  // ── Dressing room ──────────────────────────────────────────────────────────
+  cx.fillStyle='#d4b8a0';cx.fillRect(DRESSING_X,FLOOR_Y-150,70,150);
+  cx.fillStyle='rgba(0,0,0,0.1)';cx.fillRect(DRESSING_X,FLOOR_Y-150,4,150);
+  cx.fillStyle='rgba(0,0,0,0.1)';cx.fillRect(DRESSING_X+66,FLOOR_Y-150,4,150);
+  // Curtain
+  cx.fillStyle='#c060a0';cx.fillRect(DRESSING_X+2,FLOOR_Y-148,66,8);
+  // Door panel
+  cx.fillStyle='rgba(0,0,0,0.15)';cx.fillRect(DRESSING_X+2,FLOOR_Y-140,66,138);
+  cx.fillStyle='#c060a0';
+  for(let i=0;i<3;i++){cx.fillRect(DRESSING_X+8+i*18,FLOOR_Y-138,14,134);}
+  // Label
+  cx.fillStyle='#800060';cx.font='bold 8px sans-serif';cx.textAlign='center';
+  cx.fillText('Umkleide',DRESSING_X+35,FLOOR_Y-155);
+  cx.textAlign='left';
+
+  // ── Racks ──────────────────────────────────────────────────────────────────
+  for(let r=0;r<4;r++){
+    drawRack(RACK_XS[r],RACK_Y,RACK_COLS[r],RACK_NAMES[r]);
+  }
+
+  // ── Counter ────────────────────────────────────────────────────────────────
+  cx.fillStyle='#8b4513';
+  cx.fillRect(COUNTER_X-55,FLOOR_Y-55,110,55);
+  cx.fillStyle='#a0522d';
+  cx.fillRect(COUNTER_X-55,FLOOR_Y-65,110,14);
+  // Counter top gloss
+  cx.fillStyle='rgba(255,255,255,0.15)';
+  cx.fillRect(COUNTER_X-53,FLOOR_Y-63,50,4);
+  // Cash register
+  cx.fillStyle='#1a1a1a';cx.fillRect(COUNTER_X+10,FLOOR_Y-80,30,24);
+  cx.fillStyle='#2a9d2a';cx.fillRect(COUNTER_X+13,FLOOR_Y-78,24,14);
+  cx.fillStyle='#333';cx.fillRect(COUNTER_X+10,FLOOR_Y-56,30,4);
+  cx.fillStyle='white';cx.font='6px monospace';cx.textAlign='center';
+  cx.fillText('KASSE',COUNTER_X+25,FLOOR_Y-66);cx.textAlign='left';
+  // Counter label
+  cx.fillStyle='#5a2d00';cx.font='bold 8px sans-serif';cx.textAlign='center';
+  cx.fillText('Tresen',COUNTER_X,FLOOR_Y-70);cx.textAlign='left';
+
+  // ── Glass door ─────────────────────────────────────────────────────────────
+  cx.fillStyle='#8b6914';cx.fillRect(DOOR_X-5,FLOOR_Y-200,10,200);
+  cx.fillStyle='rgba(160,220,255,0.4)';cx.fillRect(DOOR_X,FLOOR_Y-200,48,195);
+  // Door frame
+  cx.strokeStyle='#8b6914';cx.lineWidth=3;
+  cx.strokeRect(DOOR_X,FLOOR_Y-200,48,198);
+  cx.lineWidth=1;cx.strokeStyle='rgba(255,255,255,0.5)';
+  cx.beginPath();cx.moveTo(DOOR_X+24,FLOOR_Y-200);cx.lineTo(DOOR_X+24,FLOOR_Y-2);cx.stroke();
+  cx.beginPath();cx.moveTo(DOOR_X,FLOOR_Y-100);cx.lineTo(DOOR_X+48,FLOOR_Y-100);cx.stroke();
+  // Door handle
+  cx.fillStyle='#c8a020';cx.beginPath();cx.arc(DOOR_X+8,FLOOR_Y-100,4,0,Math.PI*2);cx.fill();
+  // Mannequin in window
+  drawMannequin(DOOR_X+24,FLOOR_Y-10);
+  // Sign
+  cx.fillStyle='rgba(200,50,120,0.9)';cx.fillRect(DOOR_X+2,FLOOR_Y-195,44,18);
+  cx.fillStyle='#fff';cx.font='bold 9px sans-serif';cx.textAlign='center';
+  cx.fillText('TREDY',DOOR_X+24,FLOOR_Y-183);cx.textAlign='left';
+
+  // ── Ceiling light strip ────────────────────────────────────────────────────
+  const lgrad=cx.createLinearGradient(0,0,0,20);
+  lgrad.addColorStop(0,'rgba(255,240,200,0.7)');
+  lgrad.addColorStop(1,'transparent');
+  cx.fillStyle=lgrad;cx.fillRect(0,0,W,20);
+}
+
+function drawRack(x,y,col,name){
+  // Pole
+  cx.strokeStyle='#888';cx.lineWidth=4;
+  cx.beginPath();cx.moveTo(x-RACK_W/2,y);cx.lineTo(x+RACK_W/2,y);cx.stroke();
+  // Legs
+  cx.strokeStyle='#666';cx.lineWidth=3;
+  cx.beginPath();cx.moveTo(x-RACK_W/2+6,y);cx.lineTo(x-RACK_W/2+6,FLOOR_Y);cx.stroke();
+  cx.beginPath();cx.moveTo(x+RACK_W/2-6,y);cx.lineTo(x+RACK_W/2-6,FLOOR_Y);cx.stroke();
+  // Colour indicator band
+  cx.fillStyle=col;cx.fillRect(x-RACK_W/2,y-6,RACK_W,6);
+  cx.globalAlpha=0.3;cx.fillStyle=col;cx.fillRect(x-RACK_W/2,y,RACK_W,RACK_H*0.3);
+  cx.globalAlpha=1;
+  // Label
+  cx.fillStyle='#333';cx.font='bold 9px sans-serif';cx.textAlign='center';
+  cx.fillText(name,x,y-10);cx.textAlign='left';
+}
+
+function drawMannequin(x,y){
+  // Simple mannequin silhouette
+  cx.fillStyle='#c8a060';
+  // Body
+  cx.fillRect(x-8,y-80,16,50);
+  // Head
+  cx.beginPath();cx.arc(x,y-90,9,0,Math.PI*2);cx.fill();
+  // Dress
+  cx.fillStyle='#c060a0';
+  cx.beginPath();cx.moveTo(x-10,y-50);cx.lineTo(x+10,y-50);cx.lineTo(x+18,y-15);cx.lineTo(x-18,y-15);cx.closePath();cx.fill();
+  // Sparkle
+  cx.fillStyle='#f0c040';cx.font='10px sans-serif';
+  cx.fillText('✨',x+6,y-40);
+}
+
+function drawItems(){
+  for(const item of items){
+    if(item.carriedBy!=null&&item.carriedBy!=='mia')continue;
+    if(item.carriedBy==='mia')continue; // drawn with mia
+    drawItem(item.x,item.hanging?item.y:item.y,RACK_COLS[item.rack],item.misplaced);
+  }
+}
+
+function drawItem(x,y,col,mis){
+  // Hanger
+  cx.strokeStyle=mis?'#e00':'#888';cx.lineWidth=1.5;
+  cx.beginPath();cx.moveTo(x,y);cx.arc(x,y+3,5,Math.PI*1.5,Math.PI*0.5,false);cx.stroke();
+  // Garment
+  cx.fillStyle=col;cx.globalAlpha=0.85;
+  cx.fillRect(x-8,y+3,16,18);
+  if(mis){
+    cx.fillStyle='#e00';cx.globalAlpha=0.4;
+    cx.fillRect(x-8,y+3,16,18);
+  }
+  cx.globalAlpha=1;
+  // Shine
+  cx.fillStyle='rgba(255,255,255,0.3)';
+  cx.fillRect(x-5,y+5,5,6);
+}
+
+function drawPackages(){
+  for(const pkg of packages){
+    if(pkg.opened)continue;
+    cx.fillStyle='#c8a050';cx.fillRect(pkg.x-18,pkg.y-28,36,28);
+    cx.strokeStyle='#8b6914';cx.lineWidth=2;cx.strokeRect(pkg.x-18,pkg.y-28,36,28);
+    // Ribbon
+    cx.strokeStyle='#e03060';cx.lineWidth=2;
+    cx.beginPath();cx.moveTo(pkg.x,pkg.y-28);cx.lineTo(pkg.x,pkg.y);cx.stroke();
+    cx.beginPath();cx.moveTo(pkg.x-18,pkg.y-14);cx.lineTo(pkg.x+18,pkg.y-14);cx.stroke();
+    cx.font='10px sans-serif';cx.textAlign='center';
+    cx.fillText('📦',pkg.x,pkg.y-8);cx.textAlign='left';
+  }
+}
+
+function drawActors(){
+  for(const a of actors){
+    if(a.type===ACT.WEIBERGRUPPE)drawWeibergruppe(a);
+    else if(a.type===ACT.STAMMKUNDIN)drawStammkundin(a);
+    else if(a.type===ACT.POSTBOTE)drawPostbote(a);
+    else if(a.type===ACT.MANAGEMENT)drawManagement(a);
+  }
+}
+
+function drawWeibergruppe(a){
+  a.members.forEach((m,i)=>{
+    const x=a.x+m.dx;
+    drawPerson(x,a.y,['#e8a0b8','#b0d8f0','#b8e8b0'][i],a.dir,`W${i}`,14+i*2);
+    // speech bubble
+    if(a.state==='chaos'&&frame%40<20&&i===1){
+      drawBubble(x,a.y-70,'🗣️ Schnatter!',80);
+    }
+  });
+}
+
+function drawStammkundin(a){
+  drawPerson(a.x,a.y,a.col,a.dir,a.name[0],16);
+  if(a.state==='waiting'&&frame%30<15){
+    const wait=Math.floor(a.waitAtCounter/60);
+    drawBubble(a.x,a.y-70,`⏱️ ${wait}s…`,70);
+  }
+  if(a.items.length>0){
+    cx.font='9px sans-serif';cx.textAlign='center';
+    cx.fillStyle='#333';
+    cx.fillText(`👗×${a.items.length}`,a.x,a.y-60);
+    cx.textAlign='left';
+  }
+}
+
+function drawPostbote(a){
+  drawPerson(a.x,a.y,'#d4a040',a.dir,'P',15);
+  // Package stack
+  if(a.state!=='leave'){
+    for(let i=0;i<Math.min(a.pkgCount,3);i++){
+      cx.fillStyle='#c8a050';cx.fillRect(a.x-12,a.y-70-i*14,24,13);
+      cx.strokeStyle='#8b6914';cx.lineWidth=1;cx.strokeRect(a.x-12,a.y-70-i*14,24,13);
+    }
+  }
+  if(a.happy&&frame%20<10){
+    drawBubble(a.x,a.y-110,'😊 Gerne!',60);
+  }
+}
+
+function drawManagement(a){
+  drawPerson(a.x,a.y,'#c0c0e0',a.dir,'M',17);
+  // Clipboard
+  cx.fillStyle='#f0f0e0';cx.fillRect(a.x+(a.dir>0?10:-24),a.y-50,14,18);
+  cx.strokeStyle='#888';cx.lineWidth=1;cx.strokeRect(a.x+(a.dir>0?10:-24),a.y-50,14,18);
+  cx.fillStyle='#888';
+  for(let i=0;i<3;i++)cx.fillRect(a.x+(a.dir>0?12:-22),a.y-47+i*5,10,1.5);
+  if(a.state==='inspect'&&frame%25<12){
+    drawBubble(a.x,a.y-80,'🔍 Kontrolle!',80);
+  }
+}
+
+function drawPerson(x,y,col,dir,label,headR){
+  const walk=Math.sin(frame*0.2)*3;
+  // Shadow
+  cx.fillStyle='rgba(0,0,0,0.12)';cx.beginPath();
+  cx.ellipse(x,y+2,12,4,0,0,Math.PI*2);cx.fill();
+  // Legs
+  cx.fillStyle='#333';
+  cx.fillRect(x-5,y-18,5,18);
+  cx.fillRect(x+1,y-18+Math.abs(walk),5,18-Math.abs(walk));
+  // Shoes
+  cx.fillStyle='#1a1a1a';
+  cx.fillRect(x-6,y-3,8,4);cx.fillRect(x,y-3,8,4);
+  // Body
+  cx.fillStyle=col;cx.fillRect(x-9,y-42,18,26);
+  // Arms
+  cx.fillStyle=col;
+  cx.fillRect(x+(dir>0?8:-14),y-40,6,16);
+  cx.fillRect(x+(dir>0?-14:8),y-40+walk,6,14);
+  // Head
+  cx.fillStyle='#f0c898';cx.beginPath();
+  cx.arc(x,y-48,headR,0,Math.PI*2);cx.fill();
+  // Hair — use label as simple indicator
+  cx.fillStyle='#4a1a00';cx.beginPath();
+  cx.arc(x,y-52,headR*0.85,Math.PI,0);cx.fill();
+  // Eyes
+  cx.fillStyle='#1a1a1a';
+  cx.fillRect(x+dir*2,y-50,2,2);
+  // Label tag
+  cx.fillStyle='rgba(0,0,0,0.5)';cx.font='bold 8px sans-serif';cx.textAlign='center';
+  cx.fillText(label,x,y-70);cx.textAlign='left';
+}
+
+function drawBubble(x,y,text,w){
+  cx.fillStyle='rgba(255,255,255,0.92)';
+  cx.beginPath();cx.roundRect(x-w/2,y-16,w,18,4);cx.fill();
+  cx.strokeStyle='rgba(0,0,0,0.15)';cx.lineWidth=1;
+  cx.beginPath();cx.roundRect(x-w/2,y-16,w,18,4);cx.stroke();
+  cx.fillStyle='#333';cx.font='7px sans-serif';cx.textAlign='center';
+  cx.fillText(text,x,y-4);cx.textAlign='left';
+}
+
+function drawMia(){
+  const x=mia.x,y=mia.y;
+  const walk=Math.sin(mia.animT*0.25)*4;
+  const blink=mia.blinkT%80<4;
+
+  // Shadow
+  cx.fillStyle='rgba(0,0,0,0.15)';cx.beginPath();
+  cx.ellipse(x,y+2,14,5,0,0,Math.PI*2);cx.fill();
+
+  // Legs
+  cx.fillStyle='#1a0a10';
+  cx.fillRect(x-6,y-20,5,20);
+  cx.fillRect(x+2,y-20+Math.abs(walk)*0.5,5,20);
+  // Shoes – pointy heels
+  cx.fillStyle='#c060a0';
+  cx.beginPath();cx.moveTo(x-7,y);cx.lineTo(x-7,y-4);cx.lineTo(x+3,y-4);cx.lineTo(x+3,y);cx.closePath();cx.fill();
+  cx.beginPath();cx.moveTo(x+1,y);cx.lineTo(x+1,y-4);cx.lineTo(x+11,y-4);cx.lineTo(x+11,y);cx.closePath();cx.fill();
+  // Heel spike
+  cx.fillStyle='#a04080';cx.fillRect(x-5,y,2,4);cx.fillRect(x+3,y,2,4);
+
+  // Skirt – glittery
+  cx.fillStyle='#d060b0';
+  cx.beginPath();cx.moveTo(x-12,y-20);cx.lineTo(x+12,y-20);cx.lineTo(x+16,y-4);cx.lineTo(x-16,y-4);cx.closePath();cx.fill();
+  // Glitter on skirt
+  cx.fillStyle='#f0c040';cx.font='7px sans-serif';
+  for(let g=0;g<4;g++){
+    cx.fillText('✦',x-10+g*6,(y-10+Math.sin(frame*0.1+g)*2));
+  }
+
+  // Blouse – glittery top
+  cx.fillStyle='#e070c0';cx.fillRect(x-9,y-46,18,28);
+  cx.fillStyle='#f8d0f0';cx.fillRect(x-7,y-44,6,10);// lapel
+  // Sequins
+  const seqCols=['#f0c040','#60d0f0','#f06080'];
+  for(let s=0;s<6;s++){
+    cx.fillStyle=seqCols[s%3];
+    cx.beginPath();cx.arc(x-6+s*2.5,y-38+Math.sin(s)*3,1.5,0,Math.PI*2);cx.fill();
+  }
+  // Belt
+  cx.fillStyle='#a02060';cx.fillRect(x-10,y-22,20,4);
+  cx.fillStyle='#f0c040';cx.fillRect(x-3,y-23,6,6);// buckle
+
+  // Arms
+  cx.fillStyle='#e070c0';
+  cx.fillRect(x+(mia.dir>0?8:-14),y-44,6,20);
+  cx.fillRect(x+(mia.dir>0?-14:8),y-44+walk*0.4,6,18);
+  // Hands
+  cx.fillStyle='#f0c898';
+  cx.beginPath();cx.arc(x+(mia.dir>0?11:-11),y-26,4,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.arc(x+(mia.dir>0?-11:11),y-26+walk*0.3,4,0,Math.PI*2);cx.fill();
+
+  // Carried items
+  if(mia.carrying.length>0){
+    for(let ci=0;ci<Math.min(mia.carrying.length,3);ci++){
+      const itm=items.find(i=>i.id===mia.carrying[ci]);
+      if(itm){
+        drawItem(x+(mia.dir>0?14:-14),y-30-ci*22,RACK_COLS[itm.rack],false);
+      }
+    }
+  }
+
+  // Neck
+  cx.fillStyle='#f0c898';cx.fillRect(x-3,y-52,6,8);
+
+  // Head
+  cx.fillStyle='#f0c898';cx.beginPath();
+  cx.arc(x,y-58,12,0,Math.PI*2);cx.fill();
+
+  // Hair – rötlich-braun with Dutt
+  cx.fillStyle='#6b2200';
+  cx.beginPath();cx.arc(x,y-63,12,Math.PI,0);cx.fill();
+  // Dutt
+  cx.beginPath();cx.arc(x+2,y-72,7,0,Math.PI*2);cx.fill();
+  // Hairband
+  cx.fillStyle='#c060a0';cx.beginPath();
+  cx.arc(x+2,y-72,7,Math.PI*0.8,Math.PI*2.2);cx.stroke();
+  // Hair strands
+  cx.strokeStyle='#5a1a00';cx.lineWidth=1.5;
+  cx.beginPath();cx.moveTo(x-11,y-60);cx.quadraticCurveTo(x-14,y-68,x-5,y-74);cx.stroke();
+  cx.beginPath();cx.moveTo(x+11,y-60);cx.quadraticCurveTo(x+14,y-66,x+8,y-72);cx.stroke();
+
+  // Eyes
+  cx.fillStyle='#1a0a00';
+  if(blink){cx.fillRect(x-5,y-60,4,1.5);cx.fillRect(x+2,y-60,4,1.5);}
+  else{cx.beginPath();cx.arc(x-3,y-60,2.5,0,Math.PI*2);cx.fill();
+       cx.beginPath();cx.arc(x+4,y-60,2.5,0,Math.PI*2);cx.fill();
+       cx.fillStyle='white';cx.beginPath();cx.arc(x-2,y-61,1,0,Math.PI*2);cx.fill();
+       cx.beginPath();cx.arc(x+5,y-61,1,0,Math.PI*2);cx.fill();}
+  // Eyebrows
+  cx.strokeStyle='#3a0e00';cx.lineWidth=1.5;
+  cx.beginPath();cx.moveTo(x-6,y-64);cx.lineTo(x-1,y-63);cx.stroke();
+  cx.beginPath();cx.moveTo(x+7,y-64);cx.lineTo(x+2,y-63);cx.stroke();
+  // Smile
+  cx.strokeStyle='#c04060';cx.lineWidth=1.2;
+  cx.beginPath();cx.arc(x+1,y-56,3,0.2,Math.PI-0.2);cx.stroke();
+  // Lashes
+  cx.strokeStyle='#1a0a00';cx.lineWidth=1;
+  for(let l=-2;l<=2;l++){
+    cx.beginPath();cx.moveTo(x-3+l*1,y-62.5);cx.lineTo(x-3+l*1,y-65);cx.stroke();
+    cx.beginPath();cx.moveTo(x+4+l*1,y-62.5);cx.lineTo(x+4+l*1,y-65);cx.stroke();
+  }
+  // Earrings
+  cx.fillStyle='#f0c040';
+  cx.beginPath();cx.arc(x-12,y-57,3,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.arc(x+12,y-57,3,0,Math.PI*2);cx.fill();
+  // Sparkle around her
+  if(frame%60<10){
+    cx.font='10px sans-serif';
+    cx.fillText('✨',x+14,y-70);
+    cx.fillText('✦',x-20,y-55);
+  }
+
+  // Talk indicator
+  if(mia.talkTimer>0){
+    drawBubble(x,y-80,'💬',30);
+  }
+}
+
+function drawUI2D(){
+  // Misplaced indicator
+  const mis=countMisplaced();
+  const unop=countUnopened();
+  if(mis>0||unop>0){
+    cx.fillStyle='rgba(200,0,0,0.7)';
+    cx.fillRect(W/2-80,H-28,160,22);
+    cx.fillStyle='white';cx.font='bold 9px sans-serif';cx.textAlign='center';
+    cx.fillText(`⚠️ Falsch: ${mis}  📦 Offen: ${unop}`,W/2,H-13);
+    cx.textAlign='left';
+  }
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+let _last=0;
+function loop(ts){
+  if(ts-_last<15.9){requestAnimationFrame(loop);return;}
+  _last=ts;
+  if(state===ST.PLAY){update();}
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function startGame(){
+  state=ST.PLAY;
+  score=0;level=1;frame=0;shakeT=0;
+  actors=[];packages=[];
+  spawnTimer=240;spawnMin=180;spawnMax=440;
+  initItems();
+  uiScore();uiLevel();
+  msg('✨ Willkommen bei Tredy! Viel Erfolg, Mia!',200);
+  document.getElementById('splash').style.display='none';
+}
+
+document.getElementById('btn-start').addEventListener('click',startGame);
+document.getElementById('btn-start').addEventListener('touchend',e=>{e.preventDefault();startGame();});
+
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js');}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
