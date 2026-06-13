@@ -26,26 +26,8 @@ canvas{display:block;touch-action:none}
   min-height:1.2em;text-shadow:0 0 6px #e83e8c}
 #ui-level{color:#b9f;font-size:0.85rem;font-weight:600}
 
-/* Mobile controls */
-#ctrl{position:fixed;bottom:0;left:0;right:0;z-index:10;
-  display:none;height:140px;pointer-events:none;
-  padding:10px 20px 24px}
-#joy-base{position:absolute;left:24px;bottom:24px;
-  width:96px;height:96px;border-radius:50%;
-  background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.25);
-  pointer-events:all;touch-action:none}
-#joy-knob{position:absolute;width:38px;height:38px;border-radius:50%;
-  background:rgba(240,180,220,0.7);border:2px solid rgba(255,200,230,0.9);
-  top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
-#btn-action{position:absolute;right:24px;bottom:24px;
-  width:80px;height:80px;border-radius:50%;
-  background:radial-gradient(circle,#e83e8c,#a02060);
-  border:3px solid #f9c;font-size:1.6rem;color:#fff;
-  display:flex;align-items:center;justify-content:center;
-  pointer-events:all;touch-action:none;user-select:none;
-  box-shadow:0 0 16px rgba(232,62,140,0.6)}
-#btn-action:active{transform:scale(0.92)}
-@media(pointer:coarse){#ctrl{display:block}}
+/* tap hint */
+#tap-hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:10;color:rgba(255,180,220,0.6);font-size:0.72rem;pointer-events:none}
 
 /* Splash / overlay */
 #splash{position:fixed;inset:0;z-index:50;
@@ -72,12 +54,11 @@ canvas{display:block;touch-action:none}
   <div class="star" style="bottom:20%;left:8%;font-size:0.9rem;animation-delay:0.8s">✨</div>
   <div class="star" style="bottom:30%;right:14%;font-size:1.2rem;animation-delay:1.2s">⭐</div>
   <h1>✨ Tredy ✨</h1>
-  <p>Du bist Mia, Verkäuferin im schönsten Modeladen der Stadt. Berate Stammkundinnen, halte die Kleiderstangen in Ordnung und lasse die Managerin nicht warten!</p>
+  <p>Du bist <b style='color:#f0c040'>Tiffany</b>, Verkäuferin im schönsten Modeladen der Stadt! Tippe auf alles was Aufmerksamkeit braucht – Tiffany kümmert sich!</p>
   <div style="font-size:0.8rem;color:#c8a0b8;line-height:1.8">
-    🕹️ Desktop: Pfeiltasten + Leertaste<br>
-    📱 Mobile: Joystick + Aktions-Button
+👆 Tippe auf Kunden, Kleidung, Pakete – Tiffany erledigt den Rest!
   </div>
-  <button id="btn-start">Los geht's! 🛍️</button>
+  <button id="btn-start">Los geht's Tiffany! 🛍️</button>
 </div>
 
 <div id="ui">
@@ -86,10 +67,7 @@ canvas{display:block;touch-action:none}
   <span id="ui-level">Level 1</span>
 </div>
 <canvas id="c"></canvas>
-<div id="ctrl">
-  <div id="joy-base"><div id="joy-knob"></div></div>
-  <div id="btn-action">👗</div>
-</div>
+<div id="tap-hint">👆 Tippe auf alles was Aufmerksamkeit braucht</div>
 
 <script>
 'use strict';
@@ -224,51 +202,61 @@ function spawnActor(){
   }
 }
 
-// ── Input ─────────────────────────────────────────────────────────────────────
-const K={};
-document.addEventListener('keydown',e=>{K[e.code]=true;
-  if(e.code==='Space')doAction();
-  if(['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();
-});
-document.addEventListener('keyup',e=>{K[e.code]=false;});
+// ── Tap-to-direct ────────────────────────────────────────────────────────────
+let tiffTarget=null;
+let tapRipples=[];
 
-// Touch joystick
-let joyActive=false,joyDx=0;
-const joyBase=document.getElementById('joy-base');
-const joyKnob=document.getElementById('joy-knob');
-(function(){
-  let startX=0,startY=0,activeId=null;
-  const br=48;
-  function upd(cx2,cy2){
-    const rect=joyBase.getBoundingClientRect();
-    const bx=rect.left+rect.width/2,by=rect.top+rect.height/2;
-    const dx=cx2-bx,dy=cy2-by;
-    const dist=Math.sqrt(dx*dx+dy*dy);
-    const r=Math.min(dist,br*0.7);
-    const a=Math.atan2(dy,dx);
-    joyKnob.style.transform=`translate(calc(-50% + ${Math.cos(a)*r}px),calc(-50% + ${Math.sin(a)*r}px))`;
-    joyDx=dist>br*0.2?dx/dist:0;
-  }
-  joyBase.addEventListener('touchstart',e=>{
-    e.preventDefault();const t=e.changedTouches[0];
-    activeId=t.identifier;joyActive=true;upd(t.clientX,t.clientY);
-  },{passive:false});
-  joyBase.addEventListener('touchmove',e=>{
-    e.preventDefault();
-    for(const t of e.changedTouches)if(t.identifier===activeId)upd(t.clientX,t.clientY);
-  },{passive:false});
-  joyBase.addEventListener('touchend',e=>{
-    for(const t of e.changedTouches)if(t.identifier===activeId){
-      joyActive=false;joyDx=0;joyKnob.style.transform='translate(-50%,-50%)';activeId=null;
+function screenToGame(cx2,cy2){
+  const rect=cv.getBoundingClientRect();
+  return{x:(cx2-rect.left)/SCALE, y:(cy2-rect.top)/SCALE};
+}
+
+function handleTap(clientX,clientY){
+  if(state!==ST.PLAY)return;
+  const g=screenToGame(clientX,clientY);
+  tapRipples.push({x:g.x,y:g.y,t:0});
+  const gx=g.x;
+
+  // 1. Waiting customer at counter
+  for(const a of actors){
+    if(a.type===ACT.STAMMKUNDIN&&a.state==='waiting'&&Math.abs(gx-a.x)<55){
+      tiffTarget={x:COUNTER_X,lbl:'💳 Zur Kasse…',action:()=>payCustomer(a)};return;
     }
-  },{passive:false});
-})();
+  }
+  // 2. Any actor – talk
+  for(const a of actors){
+    if(Math.abs(gx-a.x)<50){
+      tiffTarget={x:a.x,lbl:'💬 Gehe hin…',action:()=>{mia.talking=a.id;mia.talkTimer=180;onTalk(a);}};return;
+    }
+  }
+  // 3. Unopened package
+  for(const pkg of packages){
+    if(!pkg.opened&&Math.abs(gx-pkg.x)<45){
+      tiffTarget={x:pkg.x,lbl:'📦 Auspacken…',action:()=>openPackage(pkg)};return;
+    }
+  }
+  // 4. Floor item or misplaced item → auto-sort
+  for(const item of items){
+    if(item.carriedBy!=null)continue;
+    if(Math.abs(gx-item.x)<32){
+      const dest=item.rack;
+      tiffTarget={x:item.x,lbl:'👗 Einsortieren…',action:()=>pickAndSort(item,dest)};return;
+    }
+  }
+  // 5. Rack with misplaced
+  for(let r=0;r<4;r++){
+    const bad=items.filter(i=>i.hanging&&i.misplaced&&Math.abs(i.x-RACK_XS[r])<80);
+    if(bad.length>0&&Math.abs(gx-RACK_XS[r])<55){
+      tiffTarget={x:RACK_XS[r],lbl:'👗 Sortieren…',action:()=>sortOne(r)};return;
+    }
+  }
+  // Default: walk
+  tiffTarget={x:gx,lbl:null,action:null};
+}
 
-document.getElementById('btn-action').addEventListener('touchstart',e=>{
-  e.preventDefault();doAction();
-},{passive:false});
+cv.addEventListener('click',e=>handleTap(e.clientX,e.clientY));
+cv.addEventListener('touchend',e=>{e.preventDefault();const t=e.changedTouches[0];handleTap(t.clientX,t.clientY);},{passive:false});
 
-// Fullscreen on first touch
 document.addEventListener('touchstart',function fs(){
   const el=document.documentElement;
   if(el.requestFullscreen)el.requestFullscreen({navigationUI:'hide'}).catch(()=>{});
@@ -276,87 +264,47 @@ document.addEventListener('touchstart',function fs(){
   document.removeEventListener('touchstart',fs);
 },{once:true,passive:true});
 
-// ── Action logic ──────────────────────────────────────────────────────────────
+// ── Action helpers ────────────────────────────────────────────────────────────
 function nearX(ax,bx,d){return Math.abs(ax-bx)<d;}
 
-function doAction(){
-  if(state!==ST.PLAY)return;
-
-  // 1. Talk to nearby actor
-  for(const a of actors){
-    if(nearX(mia.x,a.x,55)&&!mia.talking){
-      mia.talking=a.id;mia.talkTimer=180;
-      onTalk(a);
-      return;
-    }
-  }
-
-  // 2. Pick up item from rack
-  if(mia.carrying.length<mia.maxCarry){
-    for(const item of items){
-      if(!item.hanging||item.carriedBy!=null)continue;
-      const rx=RACK_XS[item.rack];
-      if(nearX(mia.x,rx,55)){
-        item.hanging=false;item.carriedBy='mia';
-        mia.carrying.push(item.id);
-        msg('👗 Aufgenommen!',60);
-        return;
-      }
-    }
-  }
-
-  // 3. Hang item on rack
-  if(mia.carrying.length>0){
-    for(let r=0;r<4;r++){
-      if(nearX(mia.x,RACK_XS[r],55)){
-        const itemId=mia.carrying[0];
-        const item=items.find(i=>i.id===itemId);
-        if(item){
-          item.hanging=true;item.carriedBy=null;
-          item.x=RACK_XS[r]+(Math.random()-0.5)*40;
-          item.y=RACK_Y+10+Math.random()*20;
-          item.rack=r; // reassign to this rack
-          item.misplaced=false; // correct rack
-          mia.carrying.splice(0,1);
-          msg('✅ Einsortiert!',60);
-          score+=2;uiScore();
-        }
-        return;
-      }
-    }
-  }
-
-  // 4. Open package
-  for(const pkg of packages){
-    if(!pkg.opened&&nearX(mia.x,pkg.x,60)){
-      pkg.opened=true;
-      for(const iid of pkg.items){
-        const item=items.find(i=>i.id===iid);
-        if(item){item.x=pkg.x+(Math.random()-0.5)*40;item.y=pkg.y-20;item.hanging=false;item.carriedBy=null;}
-      }
-      msg('📦 Paket geöffnet!',90);
-      return;
-    }
-  }
-
-  // 5. Pay customer at counter
-  for(const a of actors){
-    if(a.type===ACT.STAMMKUNDIN&&a.state==='waiting'&&nearX(mia.x,COUNTER_X,60)){
-      const rev=a.items.length*15;
-      score+=rev;uiScore();
-      msg(`💳 ${a.name} zahlt ${rev}€!`,180);
-      // remove items sold
-      a.items.forEach(iid=>{const idx=items.findIndex(i=>i.id===iid);if(idx>=0)items.splice(idx,1);});
-      // replenish
-      for(let n=0;n<a.items.length;n++){
-        const r=Math.floor(Math.random()*4);
-        items.push(makeItem(r,RACK_XS[r]+(Math.random()-0.5)*50,RACK_Y+10));
-      }
-      a.state='leave';a.timer=60;
-      return;
-    }
-  }
+function payCustomer(a){
+  if(a.state!=='waiting')return;
+  const rev=a.items.length*15;score+=rev;uiScore();
+  msg('💳 '+a.name+' zahlt '+rev+'€! Super Tiffany!',180);
+  a.items.forEach(iid=>{const idx=items.findIndex(i=>i.id===iid);if(idx>=0)items.splice(idx,1);});
+  for(let n=0;n<a.items.length;n++){const r=Math.floor(Math.random()*4);items.push(makeItem(r,RACK_XS[r]+(Math.random()-0.5)*50,RACK_Y+10));}
+  a.state='leave';a.timer=0;
 }
+
+function openPackage(pkg){
+  if(pkg.opened)return;
+  pkg.opened=true;
+  for(const iid of pkg.items){
+    const item=items.find(i=>i.id===iid);
+    if(item){item.x=pkg.x+(Math.random()-0.5)*50;item.y=FLOOR_Y-15;item.hanging=false;item.carriedBy=null;}
+  }
+  msg('📦 Paket ausgepackt! Tippe auf die Kleidung um sie einzusortieren.',110);
+}
+
+function pickAndSort(item,destRack){
+  if(item.carriedBy!=null)return;
+  item.carriedBy='mia';
+  const rx=RACK_XS[destRack];
+  tiffTarget={x:rx,lbl:'👗 Einhängen…',action:()=>{
+    item.hanging=true;item.carriedBy=null;item.misplaced=false;
+    item.x=RACK_XS[destRack]+(Math.random()-0.5)*40;item.y=RACK_Y+10;
+    score+=5;uiScore();msg('✅ Einsortiert! +5',70);
+  }};
+}
+
+function sortOne(r){
+  const bad=items.filter(i=>i.hanging&&i.misplaced&&Math.abs(i.x-RACK_XS[r])<80);
+  if(!bad.length){msg('✅ Alles korrekt sortiert!',70);return;}
+  pickAndSort(bad[0],bad[0].rack);
+}
+
+// ── Action logic ──────────────────────────────────────────────────────────────
+function nearX(ax,bx,d){return Math.abs(ax-bx)<d;}
 
 function onTalk(a){
   if(a.type===ACT.STAMMKUNDIN){
@@ -369,7 +317,8 @@ function onTalk(a){
     msg('📦 Syrischer Postbote: "Salamu alaikum! Ich helfe gerne!"',150);
     a.happy=true;a.helpTimer=200;
   } else if(a.type===ACT.MANAGEMENT){
-    msg('👔 Management: "Ich hoffe alles ist in Ordnung hier!"',120);
+    msg('👔 Managerin: "Danke Tiffany! Strafe wird halbiert."',150);
+    a.greeted=true;
   }
 }
 
@@ -390,16 +339,22 @@ function update(){
   else if(!msgText)uiMsg('');
   if(msgTimer===0&&msgText){uiMsg(msgText);msgText='';}
 
-  // Mia movement
-  let dx=0;
-  if(K['ArrowLeft'])dx=-1;
-  if(K['ArrowRight'])dx=1;
-  if(joyActive&&Math.abs(joyDx)>0.15)dx=joyDx;
-  mia.vx=dx*mia.speed;
-  mia.x=Math.max(20,Math.min(W-20,mia.x+mia.vx));
-  if(dx!==0)mia.dir=dx>0?1:-1;
-  mia.animT=frame;
+  // Tiffany walks to tap target
+  if(tiffTarget){
+    const tdx=tiffTarget.x-mia.x;
+    if(Math.abs(tdx)>4){
+      mia.x+=Math.sign(tdx)*mia.speed;
+      mia.dir=Math.sign(tdx);
+      mia.animT=frame;
+    } else {
+      if(tiffTarget.action){tiffTarget.action();}
+      tiffTarget=null;
+    }
+  }
+  mia.x=Math.max(20,Math.min(W-20,mia.x));
   mia.blinkT++;
+  // tap ripple update
+  for(let ri=tapRipples.length-1;ri>=0;ri--){tapRipples[ri].t++;if(tapRipples[ri].t>28)tapRipples.splice(ri,1);}
 
   // Talk timer
   if(mia.talkTimer>0){mia.talkTimer--;if(mia.talkTimer===0)mia.talking=null;}
@@ -591,8 +546,9 @@ function updateManagement(a){
       const mis=countMisplaced();
       const unop=countUnopened();
       let penalty=0;
-      if(mis>0){penalty+=mis*10;msg(`👔 "${mis} Kleidungsstücke falsch! –${mis*10} Punkte!"`,180);}
-      if(unop>0){penalty+=unop*15;
+      const pf=a.greeted?0.5:1;
+      if(mis>0){penalty+=Math.round(mis*10*pf);msg(`👔 "${mis} Kleidungsstücke falsch! –${mis*10} Punkte!"`,180);}
+      if(unop>0){penalty+=Math.round(unop*15*pf);
         setTimeout(()=>msg(`👔 "${unop} Pakete noch zu! –${unop*15} Punkte!"`,180),60);}
       if(penalty===0){score+=30;uiScore();msg('👔 "Alles tadellos! +30 Bonus!"',180);}
       else{score=Math.max(0,score-penalty);uiScore();shakeT=30;}
@@ -619,6 +575,7 @@ function draw(){
   drawActors();
   drawMia();
   drawUI2D();
+  drawTapRipples();
 
   cx.restore();
 }
@@ -938,7 +895,7 @@ function drawMia(){
   cx.fillStyle='#f0c898';cx.beginPath();
   cx.arc(x,y-58,12,0,Math.PI*2);cx.fill();
 
-  // Hair – rötlich-braun with Dutt
+  // Tiffany – Hair rötlich-braun with Dutt
   cx.fillStyle='#6b2200';
   cx.beginPath();cx.arc(x,y-63,12,Math.PI,0);cx.fill();
   // Dutt
@@ -988,6 +945,24 @@ function drawMia(){
   }
 }
 
+function drawTapRipples(){
+  for(const r of tapRipples){
+    const p=r.t/28;const rad=8+p*28;
+    cx.strokeStyle='rgba(232,62,140,'+(1-p)+')';cx.lineWidth=2;
+    cx.beginPath();cx.arc(r.x,r.y,rad,0,Math.PI*2);cx.stroke();
+  }
+  if(tiffTarget){
+    cx.strokeStyle='rgba(232,62,140,0.4)';cx.lineWidth=1.5;cx.setLineDash([5,5]);
+    cx.beginPath();cx.moveTo(mia.x,mia.y-4);cx.lineTo(tiffTarget.x,mia.y-4);cx.stroke();
+    cx.setLineDash([]);
+    if(tiffTarget.lbl){
+      cx.fillStyle='rgba(200,0,120,0.85)';cx.beginPath();cx.roundRect(tiffTarget.x-30,mia.y-26,60,14,4);cx.fill();
+      cx.fillStyle='#fff';cx.font='bold 7px sans-serif';cx.textAlign='center';
+      cx.fillText(tiffTarget.lbl,tiffTarget.x,mia.y-16);cx.textAlign='left';
+    }
+  }
+}
+
 function drawUI2D(){
   // Misplaced indicator
   const mis=countMisplaced();
@@ -1018,7 +993,7 @@ function startGame(){
   spawnTimer=240;spawnMin=180;spawnMax=440;
   initItems();
   uiScore();uiLevel();
-  msg('✨ Willkommen bei Tredy! Viel Erfolg, Mia!',200);
+  msg('✨ Willkommen bei Tredy! 👆 Tippe auf alles was Aufmerksamkeit braucht!',200);
   document.getElementById('splash').style.display='none';
 }
 
