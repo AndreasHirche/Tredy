@@ -987,125 +987,127 @@ function loop(ts){
 }
 
 
-// ── Rhythmic game music (WebAudio) ────────────────────────────────────────
-let _ac=null, _musicNodes=[], _musicPlaying=false, _musicBeat=0;
 
-function ac(){
+// ── Game music (WebAudio, loopahead scheduler) ──────────────────────────
+let _ac=null,_musicOn=false,_nextBeat=0,_beatCount=0;
+
+function getAC(){
   if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();
   return _ac;
 }
 
-function note(freq,start,dur,vol=0.18,type='square'){
-  const a=ac();
-  const o=a.createOscillator();
-  const g=a.createGain();
+function playTone(freq,t,dur,vol,type){
+  const a=getAC();
+  const o=a.createOscillator(),g=a.createGain();
+  o.type=type||'square';o.frequency.value=freq;
   o.connect(g);g.connect(a.destination);
-  o.type=type;o.frequency.value=freq;
-  g.gain.setValueAtTime(0,start);
-  g.gain.linearRampToValueAtTime(vol,start+0.01);
-  g.gain.exponentialRampToValueAtTime(0.001,start+dur*0.9);
-  o.start(start);o.stop(start+dur);
-  _musicNodes.push(o);
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(vol,t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.001,t+dur*0.85);
+  o.start(t);o.stop(t+dur);
 }
 
-function noiseHit(start,dur,vol=0.25,highpass=2000){
-  const a=ac();
-  const buf=a.createBuffer(1,Math.floor(a.sampleRate*dur),a.sampleRate);
+function playKick(t){
+  const a=getAC();
+  const o=a.createOscillator(),g=a.createGain();
+  o.type='sine';
+  o.frequency.setValueAtTime(160,t);
+  o.frequency.exponentialRampToValueAtTime(40,t+0.15);
+  o.connect(g);g.connect(a.destination);
+  g.gain.setValueAtTime(0.6,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+0.2);
+  o.start(t);o.stop(t+0.22);
+}
+
+function playSnare(t){
+  const a=getAC();
+  const buf=a.createBuffer(1,Math.floor(a.sampleRate*0.15),a.sampleRate);
   const d=buf.getChannelData(0);
-  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(a.sampleRate*dur*0.3));
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(a.sampleRate*0.05));
   const src=a.createBufferSource();src.buffer=buf;
-  const hp=a.createBiquadFilter();hp.type='highpass';hp.frequency.value=highpass;
+  const hp=a.createBiquadFilter();hp.type='highpass';hp.frequency.value=800;
   const g=a.createGain();
   src.connect(hp);hp.connect(g);g.connect(a.destination);
-  g.gain.setValueAtTime(vol,start);
-  src.start(start);
-  _musicNodes.push(src);
+  g.gain.setValueAtTime(0.35,t);
+  src.start(t);
 }
 
-function bass(freq,start,dur){
-  const a=ac();
-  const o=a.createOscillator();
+function playHat(t,vol){
+  const a=getAC();
+  const buf=a.createBuffer(1,Math.floor(a.sampleRate*0.05),a.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(a.sampleRate*0.02));
+  const src=a.createBufferSource();src.buffer=buf;
+  const hp=a.createBiquadFilter();hp.type='highpass';hp.frequency.value=5000;
   const g=a.createGain();
-  o.connect(g);g.connect(a.destination);
-  o.type='triangle';o.frequency.setValueAtTime(freq,start);
-  o.frequency.exponentialRampToValueAtTime(freq*0.5,start+dur);
-  g.gain.setValueAtTime(0.32,start);
-  g.gain.exponentialRampToValueAtTime(0.001,start+dur);
-  o.start(start);o.stop(start+dur+0.05);
-  _musicNodes.push(o);
+  src.connect(hp);hp.connect(g);g.connect(a.destination);
+  g.gain.setValueAtTime(vol||0.12,t);
+  src.start(t);
 }
 
-// Catchy fashion-store pop loop — 140 BPM, 4/4
-// Melody: upbeat C-major based
-const MELODY=[
-  [523,0],[659,0.5],[784,1],[659,1.5],
-  [523,2],[587,2.5],[698,3],[587,3.5],
-  [659,4],[784,4.5],[880,5],[784,5.5],
-  [698,6],[659,6.5],[523,7],[392,7.5],
+// 140 BPM → quarter = 60/140 = 0.4286s, eighth = 0.2143s
+const BPM=140, QBEAT=60/BPM, EBEAT=QBEAT/2;
+
+// Melody pattern (8 quarter beats = 2 bars)
+const MEL=[
+  [523,0],[659,1],[784,2],[659,3],
+  [523,4],[698,5],[880,6],[784,7]
 ];
-// Harmony (thirds below)
-const HARMONY=[
-  [392,0],[523,0.5],[659,1],[523,1.5],
-  [392,2],[440,2.5],[587,3],[440,3.5],
-  [523,4],[659,4.5],[698,5],[659,5.5],
-  [587,6],[523,6.5],[440,7],[330,7.5],
-];
-// Bass line
-const BASS=[
-  [130,0],[130,1],[174,2],[130,3],
-  [146,4],[146,5],[110,6],[130,7],
+const BASS_PAT=[
+  [130,0],[0,1],[174,2],[0,3],
+  [146,4],[0,5],[110,6],[0,7]
 ];
 
-const LOOP_DUR=8; // seconds per loop at ~140bpm
+function scheduleBeat(bar){
+  if(!_musicOn)return;
+  const a=getAC();
+  const t0=_nextBeat;
 
-function scheduleMusic(loopStart){
-  if(!_musicPlaying)return;
-  const a=ac();
+  // Melody (8 quarter beats)
+  MEL.forEach(([f,step])=>{ if(f>0) playTone(f,t0+step*QBEAT,QBEAT*0.7,0.10,'square'); });
+  // Octave up accent
+  [0,4].forEach(step=>{ const f=MEL[step][0]; if(f) playTone(f*2,t0+step*QBEAT+EBEAT,EBEAT*0.6,0.05,'sine'); });
 
-  // Melody
-  MELODY.forEach(([f,t])=>note(f,loopStart+t,0.38,0.12,'square'));
-  // Harmony
-  HARMONY.forEach(([f,t])=>note(f,loopStart+t,0.38,0.07,'triangle'));
   // Bass
-  BASS.forEach(([f,t])=>bass(f,loopStart+t,0.45));
+  BASS_PAT.forEach(([f,step])=>{ if(f>0) playTone(f,t0+step*QBEAT,QBEAT*0.8,0.28,'triangle'); });
 
-  // Drums: kick on 1,3 — snare on 2,4 — hihat every 8th
-  for(let beat=0;beat<8;beat++){
-    const bt=loopStart+beat*0.5;
-    // Kick: beats 0,2,4,6
-    if(beat%2===0){
-      const o=a.createOscillator();const g=a.createGain();
-      o.connect(g);g.connect(a.destination);
-      o.type='sine';o.frequency.setValueAtTime(150,bt);o.frequency.exponentialRampToValueAtTime(40,bt+0.12);
-      g.gain.setValueAtTime(0.55,bt);g.gain.exponentialRampToValueAtTime(0.001,bt+0.18);
-      o.start(bt);o.stop(bt+0.2);_musicNodes.push(o);
-    }
-    // Snare: beats 1,3,5,7
-    if(beat%2===1) noiseHit(bt,0.12,0.3,1200);
+  // Drums across 8 quarter beats (= 16 eighths)
+  for(let e=0;e<16;e++){
+    const et=t0+e*EBEAT;
+    // Kick: 1, 3, 5, 7 (quarters 0,2,4,6 in eighths = 0,4,8,12)
+    if(e===0||e===4||e===8||e===12) playKick(et);
+    // Snare: 2, 4 (quarters 1,3 in eighths = 2,6,10,14)  
+    if(e===2||e===6||e===10||e===14) playSnare(et);
     // Hihat every 8th
-    noiseHit(bt,0.06,0.1,6000);
-    // Extra hihat offbeat
-    noiseHit(bt+0.25,0.04,0.07,7000);
+    playHat(et,e%2===0?0.14:0.08);
   }
 
-  // Extra sparkle notes on beat 3+7
-  [1.5,3.5].forEach(t=>note(1047,loopStart+t,0.15,0.08,'sine'));
+  // Fun extra: a little glitter trill on beat 4+8
+  playTone(1047,t0+3*QBEAT,0.1,0.06,'sine');
+  playTone(1175,t0+7*QBEAT,0.1,0.06,'sine');
 
-  // Schedule next loop
-  setTimeout(()=>scheduleMusic(loopStart+LOOP_DUR), (LOOP_DUR-0.5)*1000);
+  _nextBeat+=8*QBEAT;
+}
+
+function musicTick(){
+  if(!_musicOn)return;
+  const a=getAC();
+  // Schedule ahead 0.3s
+  while(_nextBeat<a.currentTime+0.5) scheduleBeat(_beatCount++);
+  setTimeout(musicTick,100);
 }
 
 function startMusic(){
-  if(_musicPlaying)return;
-  _musicPlaying=true;
-  if(_ac&&_ac.state==='suspended')_ac.resume();
-  scheduleMusic(ac().currentTime+0.1);
+  if(_musicOn)return;
+  const a=getAC();
+  if(a.state==='suspended')a.resume();
+  _musicOn=true;
+  _nextBeat=a.currentTime+0.05;
+  _beatCount=0;
+  musicTick();
 }
-function stopMusic(){
-  _musicPlaying=false;
-  _musicNodes.forEach(n=>{try{n.stop(0);}catch(e){}});
-  _musicNodes=[];
-}
+
+function stopMusic(){_musicOn=false;}
 
 function startGame(){
   state=ST.PLAY;
@@ -1114,6 +1116,7 @@ function startGame(){
   spawnTimer=240;spawnMin=180;spawnMax=440;
   initItems();
   uiScore();uiLevel();
+  startMusic();
   msg('✨ Willkommen bei Tredy! 👆 Tippe auf alles was Aufmerksamkeit braucht!',200);
   document.getElementById('splash').style.display='none';
 }
