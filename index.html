@@ -192,7 +192,7 @@ function spawnActor(){
   } else if(t===ACT.POSTBOTE){
     actors.push({id:nextActorId++,type:t,x:-40,y:FLOOR_Y,dir:1,speed:1.2,
       state:'enter',timer:0,phase:0,
-      pkgCount:2+Math.floor(Math.random()*3),
+      pkgCount:1,
       delivered:false,label:'📦',
       happy:false,helpTimer:0});
   } else if(t===ACT.MANAGEMENT){
@@ -510,26 +510,27 @@ function updateStammkundin(a){
 function updatePostbote(a){
   if(a.state==='enter'){
     a.x+=a.dir*a.speed;
-    if(a.x>120){
-      a.state='deliver';a.timer=0;
-      // Spawn packages near counter
-      for(let p=0;p<a.pkgCount;p++){
-        const pkgItems=[];
-        for(let n=0;n<2;n++){
-          const r=Math.floor(Math.random()*4);
-          const newItem=makeItem(r,COUNTER_X+(p*30-30)+(Math.random()-0.5)*20,FLOOR_Y-20);
-          newItem.hanging=false;items.push(newItem);pkgItems.push(newItem.id);
-        }
-        packages.push({x:COUNTER_X-60+p*35,y:FLOOR_Y-10,rack:Math.floor(Math.random()*4),items:pkgItems,opened:false});
-      }
-      msg('📦 Postbote bringt Pakete!',120);
-    }
+    if(a.x>120){a.state='deliver';a.timer=0;msg('📦 Postbote ist unterwegs!',90);}
   }
   if(a.state==='deliver'){
     // Walk to counter
     const dx=COUNTER_X-30-a.x;
     if(Math.abs(dx)>5){a.x+=Math.sign(dx)*a.speed;a.dir=Math.sign(dx);}
-    else{a.state='waiting';a.timer=0;}
+    else{
+      // Arrived at counter — NOW drop the package on the floor
+      if(!a.delivered){
+        a.delivered=true;
+        const pkgItems=[];
+        for(let n=0;n<2;n++){
+          const r=Math.floor(Math.random()*4);
+          const newItem=makeItem(r,COUNTER_X-40+(Math.random()-0.5)*30,FLOOR_Y-20);
+          newItem.hanging=false;items.push(newItem);pkgItems.push(newItem.id);
+        }
+        packages.push({x:COUNTER_X-40,y:FLOOR_Y-10,items:pkgItems,opened:false});
+        msg('📦 Paket abgestellt! Tippe zum Auspacken.',130);
+      }
+      a.state='waiting';a.timer=0;
+    }
   }
   if(a.state==='waiting'){
     // If talked to and happy, he helps sort one item every 120 frames
@@ -829,19 +830,19 @@ function drawWeibergruppe(a){
 }
 
 function drawCarriedItem(x,y,dir,col){
-  // Draw garment over shoulder (same style as Tiffany carries)
-  const sx=x+(dir>0?14:-14), sy=y-32;
+  // Match Tiffany's carry style exactly
+  const sx=x+(dir>0?-16:16), sy=y-52;
   // Hanger hook
-  cx.strokeStyle='#aaa';cx.lineWidth=1.2;
-  cx.beginPath();cx.moveTo(sx,sy-4);cx.arc(sx,sy-1,4,Math.PI*1.5,Math.PI*0.5,false);cx.stroke();
-  // Garment body
-  cx.fillStyle=col;cx.globalAlpha=0.9;
-  cx.fillRect(sx-7,sy,14,16);
+  cx.strokeStyle='#aaa';cx.lineWidth=2;
+  cx.beginPath();cx.moveTo(sx,sy-4);cx.arc(sx,sy-1,5,Math.PI*1.5,Math.PI*0.5,false);cx.stroke();
+  // Garment rect
+  cx.fillStyle=col;cx.globalAlpha=0.92;
+  cx.fillRect(sx-9,sy-1,18,20);
   // Sleeve nubs
-  cx.fillRect(sx-10,sy+1,4,7);cx.fillRect(sx+6,sy+1,4,7);
-  // Shine
-  cx.fillStyle='rgba(255,255,255,0.25)';cx.fillRect(sx-5,sy+2,5,5);
+  cx.fillRect(sx-13,sy,6,8);cx.fillRect(sx+7,sy,6,8);
   cx.globalAlpha=1;
+  // Shine
+  cx.fillStyle='rgba(255,255,255,0.35)';cx.fillRect(sx-6,sy+2,5,7);
 }
 
 function drawStammkundin(a){
