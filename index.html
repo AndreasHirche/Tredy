@@ -293,6 +293,7 @@ function hangItemOnRack(item,rackIndex){
   item.x=RACK_XS[rackIndex]+(Math.random()-0.5)*40;
   item.y=RACK_Y+10;
   item.misplaced=(item.rack!==rackIndex);
+  // item.rack never changes — it always means 'correct rack'
   if(!item.misplaced){score+=5;uiScore();msg('✅ Richtig einsortiert! +5',70);}
   else{msg('⚠️ Falsche Stange – kommt falsch hin!',90);}
 }
@@ -432,11 +433,11 @@ function updateWeibergruppe(a){
       const rackItems=items.filter(i=>i.hanging&&(nearX(i.x,RACK1_X,60)||nearX(i.x,RACK2_X,60)));
       if(rackItems.length>0){
         const item=rackItems[Math.floor(Math.random()*rackItems.length)];
-        // move to wrong rack
+        // Move item visually to wrong rack — item.rack (correct rack) stays unchanged
         const wrongRack=(item.rack+1+Math.floor(Math.random()*3))%4;
-        item.rack=wrongRack;
         item.x=RACK_XS[wrongRack]+(Math.random()-0.5)*40;
         item.misplaced=true;
+        a.lastMovedItem=item.id;
         msg('👩‍👩‍👧 Chaos an der Kleiderstange!',90);
       }
     }
@@ -467,7 +468,8 @@ function updateStammkundin(a){
             const putBack=a.items.splice(0,1)[0];
             const itm=items.find(i=>i.id===putBack);
             if(itm){
-              const wrongR=(itm.rack+1)%4;
+              // Move visually to wrong rack, keep itm.rack as correct destination
+            const wrongR=(itm.rack+1)%4;
               itm.hanging=true;itm.carriedBy=null;
               itm.x=RACK_XS[wrongR]+(Math.random()-0.5)*30;
               itm.misplaced=true;
@@ -830,7 +832,14 @@ function drawActors(){
 function drawWeibergruppe(a){
   a.members.forEach((m,i)=>{
     const x=a.x+m.dx;
-    drawPerson(x,a.y,['#e8a0b8','#b0d8f0','#b8e8b0'][i],a.dir,`W${i}`,14+i*2);
+    drawPerson(x,a.y,['#e8a0b8','#b0d8f0','#b8e8b0'][i],a.dir,'W',14+i*2);
+    // Show last moved item over shoulder during chaos
+    if(a.state==='chaos'&&a.lastMovedItem){
+      const itm=items.find(ii=>ii.id===a.lastMovedItem);
+      if(itm&&i===1){ // middle member carries it
+        drawCarriedItem(x,a.y,a.dir,itm.col||RACK_COLS[itm.rack]);
+      }
+    }
     // speech bubble
     if(a.state==='chaos'&&frame%40<20&&i===1){
       drawBubble(x,a.y-70,'🗣️ Schnatter!',80);
