@@ -22,6 +22,7 @@ canvas{display:block;touch-action:none}
   display:flex;justify-content:space-between;align-items:center;
   padding:6px 14px;background:rgba(20,0,15,0.82);pointer-events:none}
 #ui button,#ui a{pointer-events:all}
+#ui-level{position:absolute;left:50%;transform:translateX(-50%);pointer-events:none}
 #ui-score{color:var(--gold);font-size:1.1rem;font-weight:700;text-shadow:0 0 8px var(--gold)}
 #ui-msg{color:#f9e;font-size:0.78rem;text-align:center;flex:1;padding:0 10px;
   min-height:1.2em;text-shadow:0 0 6px #e83e8c}
@@ -67,7 +68,7 @@ canvas{display:block;touch-action:none}
   <span id="ui-msg"></span>
   <span id="ui-level">Level 1</span>
   <button id="btn-pause" onclick="togglePause()" style="color:#f9c;font-size:.85rem;font-weight:700;cursor:pointer;padding:3px 10px;border:1px solid rgba(255,200,230,0.3);border-radius:6px;background:rgba(80,0,120,0.3);white-space:nowrap;font-family:inherit" title="Pause / Weiter">Pause</button>
-  <a href="https://andreashirche.github.io/Schicht/" style="color:#f9c;font-size:.85rem;font-weight:700;text-decoration:none;padding:3px 10px;border:1px solid rgba(255,200,230,0.3);border-radius:6px;background:rgba(200,0,80,0.2);white-space:nowrap" title="Beenden">Beenden</a>
+  <button onclick="quitGame()" style="color:#f9c;font-size:.85rem;font-weight:700;cursor:pointer;padding:3px 10px;border:1px solid rgba(255,200,230,0.3);border-radius:6px;background:rgba(200,0,80,0.2);white-space:nowrap;font-family:inherit" title="Beenden">Beenden</button>
 </div>
 <canvas id="c"></canvas>
 <div id="tap-hint">👆 Tippe auf alles was Aufmerksamkeit braucht</div>
@@ -1305,6 +1306,12 @@ function startMusic(){
 }
 
 function stopMusic(){_musicOn=false;}
+
+function quitGame(){
+  try{window.close();}catch(e){}
+  // Fallback if window.close() is blocked
+  setTimeout(()=>{location.href='https://andreashirche.github.io/Schicht/';},150);
+}
 
 function togglePause(){
   if(state!==ST.PLAY)return;
