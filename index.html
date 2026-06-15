@@ -83,13 +83,33 @@ const DESIGN_W=800,DESIGN_H=500;
 
 function resize(){
   const vw=window.innerWidth,vh=window.innerHeight;
-  SCALE=Math.min(vw/DESIGN_W,vh/DESIGN_H);
+  const landscape=vw>vh;
+  // In landscape: scale to fill full width; in portrait: fit both dimensions
+  if(landscape){
+    SCALE=vw/DESIGN_W;
+    // if that would make it taller than viewport, constrain by height
+    if(DESIGN_H*SCALE>vh) SCALE=vh/DESIGN_H;
+  } else {
+    SCALE=Math.min(vw/DESIGN_W,vh/DESIGN_H);
+  }
   cv.width=Math.round(DESIGN_W*SCALE);
   cv.height=Math.round(DESIGN_H*SCALE);
   cv.style.width=cv.width+'px';
   cv.style.height=cv.height+'px';
   cv.style.display='block';
   cv.style.margin='auto';
+  // In landscape: position UI bar over canvas to reclaim space
+  const ui=document.getElementById('ui');
+  if(ui){
+    if(landscape){
+      ui.style.position='absolute';
+      ui.style.top='0';
+      ui.style.background='rgba(20,0,15,0.72)';
+    } else {
+      ui.style.position='fixed';
+      ui.style.background='rgba(20,0,15,0.82)';
+    }
+  }
   W=DESIGN_W;H=DESIGN_H;
 }
 window.addEventListener('resize',resize);
@@ -309,15 +329,18 @@ function payCustomer(a){
   const rev=a.items.length*15;score+=rev;uiScore();
   msg('💳 '+a.name+' zahlt '+rev+'€! Super Tiffany!',180);
   a.items.forEach(iid=>{const idx=items.findIndex(i=>i.id===iid);if(idx>=0)items.splice(idx,1);});
-  // Restock after 2 seconds — new items start off-screen at door and hang themselves
+  // Restock: new items drift in from door position after a delay
   const restockCount=a.items.length;
   setTimeout(()=>{
     for(let n=0;n<restockCount;n++){
       const r=Math.floor(Math.random()*4);
-      const newItem=makeItem(r,RACK_XS[r]+(Math.random()-0.5)*50,RACK_Y+10);
-      items.push(newItem);
+      // Start off-screen at door, flag as 'arriving' so they're not tappable yet
+      const ni=makeItem(r, DOOR_X+40+n*20, FLOOR_Y);
+      ni.hanging=false; ni.arriving=true;
+      ni.arrivalTarget=RACK_XS[r];
+      items.push(ni);
     }
-  },2000);
+  },2500);
   a.state='leave';a.timer=0;
 }
 
@@ -388,6 +411,20 @@ function update(){
   if(msgTimer===0&&msgText){uiMsg(msgText);msgText='';}
 
   // Tiffany walks to tap target
+  // Move arriving restock items toward their rack
+  for(const item of items){
+    if(!item.arriving)continue;
+    const tx=item.arrivalTarget, ty=RACK_Y+10;
+    const dx=tx-item.x, dy=ty-item.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<4){
+      item.x=tx+(Math.random()-0.5)*40; item.y=ty;
+      item.hanging=true; item.arriving=false;
+    } else {
+      item.x+=dx/dist*3; item.y+=dy/dist*3;
+    }
+  }
+
   if(tiffTarget){
     const tdx=tiffTarget.x-mia.x;
     if(Math.abs(tdx)>4){
@@ -1153,6 +1190,20 @@ function drawTapRipples(){
     cx.strokeStyle='rgba(232,62,140,'+(1-p)+')';cx.lineWidth=2;
     cx.beginPath();cx.arc(r.x,r.y,rad,0,Math.PI*2);cx.stroke();
   }
+  // Move arriving restock items toward their rack
+  for(const item of items){
+    if(!item.arriving)continue;
+    const tx=item.arrivalTarget, ty=RACK_Y+10;
+    const dx=tx-item.x, dy=ty-item.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<4){
+      item.x=tx+(Math.random()-0.5)*40; item.y=ty;
+      item.hanging=true; item.arriving=false;
+    } else {
+      item.x+=dx/dist*3; item.y+=dy/dist*3;
+    }
+  }
+
   if(tiffTarget){
     cx.strokeStyle='rgba(232,62,140,0.4)';cx.lineWidth=1.5;cx.setLineDash([5,5]);
     cx.beginPath();cx.moveTo(mia.x,mia.y-4);cx.lineTo(tiffTarget.x,mia.y-4);cx.stroke();
