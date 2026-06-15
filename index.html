@@ -303,7 +303,13 @@ function payCustomer(a){
   const rev=a.items.length*15;score+=rev;uiScore();
   msg('💳 '+a.name+' zahlt '+rev+'€! Super Tiffany!',180);
   a.items.forEach(iid=>{const idx=items.findIndex(i=>i.id===iid);if(idx>=0)items.splice(idx,1);});
-  for(let n=0;n<a.items.length;n++){const r=Math.floor(Math.random()*4);items.push(makeItem(r,RACK_XS[r]+(Math.random()-0.5)*50,RACK_Y+10));}
+  // Spawn restocking items spread across racks, slightly varied y so they don't overlap
+  for(let n=0;n<a.items.length;n++){
+    const r=Math.floor(Math.random()*4);
+    const nx=RACK_XS[r]+(Math.random()-0.5)*60;
+    const ny=RACK_Y+8+Math.random()*18;
+    items.push(makeItem(r,nx,ny));
+  }
   a.state='leave';a.timer=0;
 }
 
@@ -428,24 +434,49 @@ function updateWeibergruppe(a){
   }
   if(a.state==='chaos'){
     if(a.chaosCooldown>0){a.chaosCooldown--;return;}
-    // Every 80 frames, displace a random item
-    if(a.timer%80===0){
-      const rackItems=items.filter(i=>i.hanging&&(nearX(i.x,RACK1_X,60)||nearX(i.x,RACK2_X,60)));
+    // Walking to a wrong rack with an item
+    if(a.chaosTarget){
+      const dx=a.chaosTarget.destX-a.x;
+      if(Math.abs(dx)>3){
+        a.x+=Math.sign(dx)*a.speed*0.8;a.dir=Math.sign(dx);
+      } else {
+        // Arrived — hang item at wrong rack
+        const itm=items.find(i=>i.id===a.chaosTarget.itemId);
+        if(itm){
+          itm.hanging=true;itm.carriedBy=null;
+          itm.x=a.chaosTarget.destX+(Math.random()-0.5)*30;
+          itm.y=RACK_Y+10;
+          itm.misplaced=true;
+        }
+        a.chaosTarget=null;
+        msg('👩‍👩‍👧 Kleidung falsch einsortiert!',90);
+      }
+    }
+    // Every 100 frames, grab a new item and walk to wrong rack
+    if(!a.chaosTarget&&a.timer%100===0){
+      const rackItems=items.filter(i=>i.hanging&&!i.carriedBy&&
+        (nearX(i.x,RACK1_X,70)||nearX(i.x,RACK2_X,70)||nearX(i.x,RACK3_X,70)||nearX(i.x,RACK4_X,70)));
       if(rackItems.length>0){
         const item=rackItems[Math.floor(Math.random()*rackItems.length)];
-        // Move item visually to wrong rack — item.rack (correct rack) stays unchanged
+        item.hanging=false;item.carriedBy='weib';
         const wrongRack=(item.rack+1+Math.floor(Math.random()*3))%4;
-        item.x=RACK_XS[wrongRack]+(Math.random()-0.5)*40;
-        item.misplaced=true;
-        // Rotate through members so each one shows a different item
+        // Assign to a member
         if(!a.memberItems)a.memberItems=[null,null,null];
         const slot=(a.chaosItemCount||0)%3;
         a.memberItems[slot]=item.id;
         a.chaosItemCount=(a.chaosItemCount||0)+1;
-        msg('👩‍👩‍👧 Chaos an der Kleiderstange!',90);
+        a.chaosTarget={itemId:item.id,destX:RACK_XS[wrongRack]};
       }
     }
-    if(a.timer>360){a.state='leave';a.timer=0;}
+    if(a.timer>480){
+      // Drop any carried items before leaving
+      if(a.memberItems){a.memberItems.forEach(iid=>{
+        if(!iid)return;
+        const itm=items.find(i=>i.id===iid&&i.carriedBy==='weib');
+        if(itm){const r=itm.rack;itm.hanging=true;itm.carriedBy=null;itm.x=RACK_XS[r]+(Math.random()-0.5)*40;itm.y=RACK_Y+10;}
+      });}
+      a.state='leave';a.timer=0;
+    }
   }
   if(a.state==='leave'){
     a.x+=1.5*(a.dir*-1);
@@ -778,7 +809,8 @@ function drawMannequin(x,y){
 
 function drawItems(){
   for(const item of items){
-    if(item.carriedBy!=null&&item.carriedBy!=='mia')continue;
+    if(item.carriedBy!=null&&item.carriedBy!=='mia'&&item.carriedBy!=='weib')continue;
+    if(item.carriedBy==='weib')continue; // drawn with weibergruppe
     if(item.carriedBy==='mia')continue; // drawn with mia
     if(isActionable(item.x)){
       drawGlowHalo(item.x,item.y+10,28);
@@ -837,19 +869,30 @@ function drawActors(){
 }
 
 function drawWeibergruppe(a){
-  // Assign carried items to members (one per member, cycling through lastMoved)
   const memberItems=a.memberItems||[];
   a.members.forEach((m,i)=>{
     const x=a.x+m.dx;
+    // Draw person first
     drawPerson(x,a.y,['#e8a0b8','#b0d8f0','#b8e8b0'][i],a.dir,'W',14+i*2);
-    // Each member shows their own carried item
-    if(a.state==='chaos'&&memberItems[i]){
-      const itm=items.find(ii=>ii.id===memberItems[i]);
-      if(itm) drawCarriedItem(x,a.y,a.dir,itm.col);
+    // Draw item IN FRONT (after person so it overlaps)
+    const iid=memberItems[i];
+    if(iid){
+      const itm=items.find(ii=>ii.id===iid&&ii.carriedBy==='weib');
+      if(itm){
+        // Draw bigger, centred on person (not offset to shoulder) so it's visible
+        const sx=x,sy=a.y-42;
+        cx.strokeStyle='#ccc';cx.lineWidth=2;
+        cx.beginPath();cx.moveTo(sx,sy-6);cx.arc(sx,sy-2,6,Math.PI*1.5,Math.PI*0.5,false);cx.stroke();
+        cx.fillStyle=itm.col;cx.globalAlpha=0.95;
+        cx.fillRect(sx-11,sy-2,22,26);
+        cx.fillRect(sx-15,sy,8,10);cx.fillRect(sx+7,sy,8,10);
+        cx.globalAlpha=1;
+        cx.fillStyle='rgba(255,255,255,0.3)';cx.fillRect(sx-8,sy+2,7,8);
+      }
     }
-    // speech bubble on middle member
+    // speech bubble
     if(a.state==='chaos'&&frame%40<20&&i===1){
-      drawBubble(x,a.y-70,'🗣️ Schnatter!',80);
+      drawBubble(x,a.y-90,'🗣️ Schnatter!',80);
     }
   });
 }
