@@ -249,19 +249,26 @@ function handleTap(clientX,clientY){
       tiffTarget={x:pkg.x,lbl:'📦 Auspacken…',action:()=>openPackage(pkg)};return;
     }
   }
-  // 4. Floor item or misplaced item → auto-sort
+  // 4. Floor item (not hanging) → auto-sort
   for(const item of items){
-    if(item.carriedBy!=null)continue;
-    if(Math.abs(gx-item.x)<32){
+    if(item.carriedBy!=null||item.hanging)continue;  // only floor items here
+    if(Math.abs(gx-item.x)<40){
       const dest=item.rack;
       tiffTarget={x:item.x,lbl:'👗 Einsortieren…',action:()=>pickAndSort(item,dest)};return;
     }
   }
-  // 5. Rack with misplaced (only when not carrying)
+  // 5. Rack tap: pick nearest misplaced item to tap point
   for(let r=0;r<4;r++){
-    const bad=items.filter(i=>i.hanging&&i.misplaced&&Math.abs(i.x-RACK_XS[r])<80);
-    if(bad.length>0&&Math.abs(gx-RACK_XS[r])<55){
-      tiffTarget={x:RACK_XS[r],lbl:'👗 Sortieren…',action:()=>sortOne(r)};return;
+    if(Math.abs(gx-RACK_XS[r])<60){
+      const bad=items.filter(i=>i.hanging&&i.misplaced&&Math.abs(i.x-RACK_XS[r])<80);
+      if(bad.length>0){
+        // Sort by distance to TAP point so user gets what they aimed at
+        bad.sort((a,b)=>Math.abs(a.x-gx)-Math.abs(b.x-gx));
+        const target=bad[0];
+        tiffTarget={x:RACK_XS[r],lbl:'👗 Sortieren…',
+          action:()=>pickAndSort(target,target.rack)};
+        return;
+      }
     }
   }
   // Default: walk
