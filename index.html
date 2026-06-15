@@ -98,7 +98,7 @@ let msgText='',msgTimer=0;
 
 function msg(t,dur=180){msgText=t;msgTimer=dur;}
 function uiMsg(t){document.getElementById('ui-msg').textContent=t;}
-function uiScore(){document.getElementById('ui-score').textContent='💰 '+score;}
+function uiScore(){document.getElementById('ui-score').textContent='💰 '+score+'€';}
 function uiLevel(){document.getElementById('ui-level').textContent='Level '+level;}
 
 // ── Layout constants ──────────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ const ACT={
 };
 
 // Spawn timers
-let spawnTimer=300,spawnMin=200,spawnMax=500;
+let spawnTimer=500,spawnMin=400,spawnMax=700;
 
 // ── Packages ─────────────────────────────────────────────────────────────────
 let packages=[];  // {x,y,rack,items:[item ids],opened:bool}
@@ -383,10 +383,13 @@ function update(){
 
   // Spawn
   spawnTimer--;
-  if(spawnTimer<=0&&actors.length<5){
+  // Max actors scales with level: start with 2, grow to 5
+  const maxActors=Math.min(2+Math.floor(level/2),5);
+  if(spawnTimer<=0&&actors.length<maxActors){
     spawnActor();
     spawnTimer=spawnMin+Math.floor(Math.random()*(spawnMax-spawnMin));
-    if(level>3)spawnTimer=Math.max(120,spawnTimer-level*20);
+    // Get faster each level
+    if(level>1)spawnTimer=Math.max(150,spawnTimer-level*30);
   }
 
   // Update actors
@@ -397,7 +400,7 @@ function update(){
   }
 
   // Level up
-  if(score>level*200){level++;uiLevel();spawnMin=Math.max(80,spawnMin-20);msg(`⭐ Level ${level}!`,180);}
+  if(score>level*150){level++;uiLevel();spawnMin=Math.max(150,spawnMin-25);msg(`⭐ Level ${level}!`,180);}
 }
 
 function updateActor(a){
@@ -825,17 +828,36 @@ function drawWeibergruppe(a){
   });
 }
 
+function drawCarriedItem(x,y,dir,col){
+  // Draw garment over shoulder (same style as Tiffany carries)
+  const sx=x+(dir>0?14:-14), sy=y-32;
+  // Hanger hook
+  cx.strokeStyle='#aaa';cx.lineWidth=1.2;
+  cx.beginPath();cx.moveTo(sx,sy-4);cx.arc(sx,sy-1,4,Math.PI*1.5,Math.PI*0.5,false);cx.stroke();
+  // Garment body
+  cx.fillStyle=col;cx.globalAlpha=0.9;
+  cx.fillRect(sx-7,sy,14,16);
+  // Sleeve nubs
+  cx.fillRect(sx-10,sy+1,4,7);cx.fillRect(sx+6,sy+1,4,7);
+  // Shine
+  cx.fillStyle='rgba(255,255,255,0.25)';cx.fillRect(sx-5,sy+2,5,5);
+  cx.globalAlpha=1;
+}
+
 function drawStammkundin(a){
   drawPerson(a.x,a.y,a.col,a.dir,a.name[0],16);
   if(a.state==='waiting'&&frame%30<15){
     const wait=Math.floor(a.waitAtCounter/60);
-    drawBubble(a.x,a.y-70,`⏱️ ${wait}s…`,70);
+    drawBubble(a.x,a.y-70,'⏱️ '+wait+'s…',70);
   }
+  // Draw carried items over shoulder
   if(a.items.length>0){
-    cx.font='9px sans-serif';cx.textAlign='center';
-    cx.fillStyle='#333';
-    cx.fillText(`👗×${a.items.length}`,a.x,a.y-60);
-    cx.textAlign='left';
+    for(let ci=0;ci<Math.min(a.items.length,3);ci++){
+      const itm=items.find(i=>i.id===a.items[ci]);
+      const col=itm?RACK_COLS[itm.rack]:'#c060a0';
+      const ox=ci*(a.dir>0?8:-8);
+      drawCarriedItem(a.x+ox,a.y,a.dir,col);
+    }
   }
 }
 
@@ -1203,7 +1225,7 @@ function startGame(){
   state=ST.PLAY;
   score=0;level=1;frame=0;shakeT=0;
   actors=[];packages=[];
-  spawnTimer=240;spawnMin=180;spawnMax=440;
+  spawnTimer=500;spawnMin=400;spawnMax=700;
   initItems();
   uiScore();uiLevel();
   startMusic();
