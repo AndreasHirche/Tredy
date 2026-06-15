@@ -65,6 +65,7 @@ canvas{display:block;touch-action:none}
   <span id="ui-score">💶 0€</span>
   <span id="ui-msg"></span>
   <span id="ui-level">Level 1</span>
+  <button id="btn-pause" onclick="togglePause()" style="color:#f9c;font-size:.85rem;font-weight:700;cursor:pointer;padding:3px 10px;border:1px solid rgba(255,200,230,0.3);border-radius:6px;background:rgba(80,0,120,0.3);white-space:nowrap;font-family:inherit" title="Pause / Weiter">⏸</button>
   <a href="https://andreashirche.github.io/Schicht/" style="color:#f9c;font-size:.85rem;font-weight:700;text-decoration:none;padding:3px 10px;border:1px solid rgba(255,200,230,0.3);border-radius:6px;background:rgba(200,0,80,0.2);white-space:nowrap" title="Beenden">✕</a>
 </div>
 <canvas id="c"></canvas>
@@ -94,7 +95,7 @@ resize();
 
 // ── Game state ───────────────────────────────────────────────────────────────
 const ST={SPLASH:'splash',PLAY:'play',OVER:'over'};
-let state=ST.SPLASH,score=0,level=1,frame=0,shakeT=0;
+let state=ST.SPLASH,score=0,level=1,frame=0,shakeT=0,paused=false;
 let msgText='',msgTimer=0;
 
 function msg(t,dur=180){msgText=t;msgTimer=dur;}
@@ -213,6 +214,7 @@ function screenToGame(cx2,cy2){
 }
 
 function handleTap(clientX,clientY){
+  if(paused&&state===ST.PLAY){paused=false;document.getElementById('btn-pause').textContent='⏸';return;}
   if(state!==ST.PLAY)return;
   const g=screenToGame(clientX,clientY);
   tapRipples.push({x:g.x,y:g.y,t:0});
@@ -696,6 +698,14 @@ function draw(){
   drawActors();
   drawMia();
   drawUI2D();
+  if(paused&&state===ST.PLAY){
+    cx.fillStyle='rgba(0,0,0,0.55)';cx.fillRect(0,0,W,H);
+    cx.fillStyle='#f9c';cx.font='bold 32px Georgia,serif';cx.textAlign='center';
+    cx.fillText('⏸ PAUSE',W/2,H/2);
+    cx.font='14px Georgia,serif';cx.fillStyle='#e8c8d8';
+    cx.fillText('▶ Tippe zum Weiterspielen',W/2,H/2+36);
+    cx.textAlign='left';
+  }
   drawTapRipples();
 
   cx.restore();
@@ -1163,7 +1173,7 @@ let _last=0;
 function loop(ts){
   if(ts-_last<15.9){requestAnimationFrame(loop);return;}
   _last=ts;
-  if(state===ST.PLAY){update();}
+  if(state===ST.PLAY&&!paused){update();}
   draw();
   requestAnimationFrame(loop);
 }
@@ -1290,6 +1300,12 @@ function startMusic(){
 }
 
 function stopMusic(){_musicOn=false;}
+
+function togglePause(){
+  if(state!==ST.PLAY)return;
+  paused=!paused;
+  document.getElementById('btn-pause').textContent=paused?'▶':'⏸';
+}
 
 function startGame(){
   state=ST.PLAY;
