@@ -308,13 +308,15 @@ function payCustomer(a){
   const rev=a.items.length*15;score+=rev;uiScore();
   msg('💳 '+a.name+' zahlt '+rev+'€! Super Tiffany!',180);
   a.items.forEach(iid=>{const idx=items.findIndex(i=>i.id===iid);if(idx>=0)items.splice(idx,1);});
-  // Spawn restocking items spread across racks, slightly varied y so they don't overlap
-  for(let n=0;n<a.items.length;n++){
-    const r=Math.floor(Math.random()*4);
-    const nx=RACK_XS[r]+(Math.random()-0.5)*60;
-    const ny=RACK_Y+8+Math.random()*18;
-    items.push(makeItem(r,nx,ny));
-  }
+  // Restock after 2 seconds — new items start off-screen at door and hang themselves
+  const restockCount=a.items.length;
+  setTimeout(()=>{
+    for(let n=0;n<restockCount;n++){
+      const r=Math.floor(Math.random()*4);
+      const newItem=makeItem(r,RACK_XS[r]+(Math.random()-0.5)*50,RACK_Y+10);
+      items.push(newItem);
+    }
+  },2000);
   a.state='leave';a.timer=0;
 }
 
