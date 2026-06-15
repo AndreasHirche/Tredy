@@ -322,13 +322,15 @@ function openPackage(pkg){
   pkg.opened=true;
   for(const iid of pkg.items){
     const item=items.find(i=>i.id===iid);
-    if(item){item.x=pkg.x+(Math.random()-0.5)*50;item.y=FLOOR_Y-15;item.hanging=false;item.carriedBy=null;}
+    if(item){item.x=pkg.x+(Math.random()-0.5)*50;item.y=FLOOR_Y-15;item.hanging=false;item.carriedBy=null;if(!item.col)item.col=RACK_COLS[item.rack];}
   }
   msg('📦 Paket ausgepackt! Tippe auf die Kleidung um sie einzusortieren.',110);
 }
 
 function pickAndSort(item,destRack){
   if(item.carriedBy!=null)return;
+  item.hanging=false;
+  if(!item.col)item.col=RACK_COLS[item.rack]; // ensure col set
   item.carriedBy='mia';
   const rx=RACK_XS[destRack];
   tiffTarget={x:rx,lbl:'👗 Einhängen…',action:()=>{
@@ -574,6 +576,7 @@ function updatePostbote(a){
         for(let n=0;n<2;n++){
           const r=Math.floor(Math.random()*4);
           const newItem=makeItem(r,COUNTER_X-40+(Math.random()-0.5)*30,FLOOR_Y-20);
+          newItem.col=RACK_COLS[r];
           newItem.hanging=false;items.push(newItem);pkgItems.push(newItem.id);
         }
         packages.push({x:COUNTER_X-40,y:FLOOR_Y-10,items:pkgItems,opened:false});
@@ -827,6 +830,7 @@ function drawItems(){
     if(isActionable(item.x)){
       drawGlowHalo(item.x,item.y+10,28);
     }
+    if(!item.col)item.col=RACK_COLS[item.rack]; // lazy assign
     drawItem(item.x,item.hanging?item.y:item.y,item.col,item.misplaced);
   }
 }
