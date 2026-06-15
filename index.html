@@ -217,6 +217,20 @@ function handleTap(clientX,clientY){
   tapRipples.push({x:g.x,y:g.y,t:0});
   const gx=g.x;
 
+  // Check if Tiffany is currently carrying an item
+  const carried=items.find(i=>i.carriedBy==='mia');
+
+  // If carrying: tapping a rack always hangs the item there
+  if(carried){
+    for(let r=0;r<4;r++){
+      if(Math.abs(gx-RACK_XS[r])<55){
+        const rackIdx=r;
+        tiffTarget={x:RACK_XS[r],lbl:'👗 Einhängen…',action:()=>hangItemOnRack(carried,rackIdx)};
+        return;
+      }
+    }
+  }
+
   // 1. Waiting customer at counter
   for(const a of actors){
     if(a.type===ACT.STAMMKUNDIN&&a.state==='waiting'&&Math.abs(gx-a.x)<55){
@@ -243,7 +257,7 @@ function handleTap(clientX,clientY){
       tiffTarget={x:item.x,lbl:'👗 Einsortieren…',action:()=>pickAndSort(item,dest)};return;
     }
   }
-  // 5. Rack with misplaced
+  // 5. Rack with misplaced (only when not carrying)
   for(let r=0;r<4;r++){
     const bad=items.filter(i=>i.hanging&&i.misplaced&&Math.abs(i.x-RACK_XS[r])<80);
     if(bad.length>0&&Math.abs(gx-RACK_XS[r])<55){
@@ -266,6 +280,15 @@ document.addEventListener('touchstart',function fs(){
 
 // ── Action helpers ────────────────────────────────────────────────────────────
 function nearX(ax,bx,d){return Math.abs(ax-bx)<d;}
+
+function hangItemOnRack(item,rackIndex){
+  item.hanging=true;item.carriedBy=null;
+  item.x=RACK_XS[rackIndex]+(Math.random()-0.5)*40;
+  item.y=RACK_Y+10;
+  item.misplaced=(item.rack!==rackIndex);
+  if(!item.misplaced){score+=5;uiScore();msg('✅ Richtig einsortiert! +5',70);}
+  else{msg('⚠️ Falsche Stange – kommt falsch hin!',90);}
+}
 
 function payCustomer(a){
   if(a.state!=='waiting')return;
@@ -304,7 +327,6 @@ function sortOne(r){
 }
 
 // ── Action logic ──────────────────────────────────────────────────────────────
-function nearX(ax,bx,d){return Math.abs(ax-bx)<d;}
 
 function onTalk(a){
   if(a.type===ACT.STAMMKUNDIN){
@@ -561,6 +583,54 @@ function updateManagement(a){
   }
 }
 
+// ── Actionable test ───────────────────────────────────────────────────────────
+function isActionable(gx){
+  if(state!==ST.PLAY)return false;
+  // Waiting customer at counter
+  for(const a of actors){
+    if(a.type===ACT.STAMMKUNDIN&&a.state==='waiting'&&Math.abs(gx-a.x)<55)return true;
+  }
+  // Any actor
+  for(const a of actors){
+    if(Math.abs(gx-a.x)<50)return true;
+  }
+  // Unopened package
+  for(const pkg of packages){
+    if(!pkg.opened&&Math.abs(gx-pkg.x)<45)return true;
+  }
+  // Floor item or misplaced hanging item
+  for(const item of items){
+    if(item.carriedBy!=null)continue;
+    if(Math.abs(gx-item.x)<32)return true;
+  }
+  // Rack with misplaced items
+  for(let r=0;r<4;r++){
+    const bad=items.filter(i=>i.hanging&&i.misplaced&&Math.abs(i.x-RACK_XS[r])<80);
+    if(bad.length>0&&Math.abs(gx-RACK_XS[r])<55)return true;
+  }
+  // Rack tap when carrying
+  const carrying=items.find(i=>i.carriedBy==='mia');
+  if(carrying){
+    for(let r=0;r<4;r++){
+      if(Math.abs(gx-RACK_XS[r])<55)return true;
+    }
+  }
+  return false;
+}
+
+function drawGlowHalo(x,y,r){
+  const pulse=0.55+0.45*Math.sin(frame*0.12);
+  const grad=cx.createRadialGradient(x,y,0,x,y,r);
+  grad.addColorStop(0,'rgba(255,200,60,'+(0.55*pulse)+')');
+  grad.addColorStop(0.5,'rgba(255,160,20,'+(0.35*pulse)+')');
+  grad.addColorStop(1,'rgba(255,140,0,0)');
+  cx.save();
+  cx.globalCompositeOperation='lighter';
+  cx.fillStyle=grad;
+  cx.beginPath();cx.arc(x,y,r,0,Math.PI*2);cx.fill();
+  cx.restore();
+}
+
 // ── Drawing ───────────────────────────────────────────────────────────────────
 function draw(){
   cx.save();
@@ -691,6 +761,9 @@ function drawItems(){
   for(const item of items){
     if(item.carriedBy!=null&&item.carriedBy!=='mia')continue;
     if(item.carriedBy==='mia')continue; // drawn with mia
+    if(isActionable(item.x)){
+      drawGlowHalo(item.x,item.y+10,28);
+    }
     drawItem(item.x,item.hanging?item.y:item.y,RACK_COLS[item.rack],item.misplaced);
   }
 }
@@ -715,6 +788,9 @@ function drawItem(x,y,col,mis){
 function drawPackages(){
   for(const pkg of packages){
     if(pkg.opened)continue;
+    if(isActionable(pkg.x)){
+      drawGlowHalo(pkg.x,pkg.y-14,38);
+    }
     cx.fillStyle='#c8a050';cx.fillRect(pkg.x-18,pkg.y-28,36,28);
     cx.strokeStyle='#8b6914';cx.lineWidth=2;cx.strokeRect(pkg.x-18,pkg.y-28,36,28);
     // Ribbon
@@ -728,6 +804,9 @@ function drawPackages(){
 
 function drawActors(){
   for(const a of actors){
+    if(isActionable(a.x)){
+      drawGlowHalo(a.x,a.y-30,44);
+    }
     if(a.type===ACT.WEIBERGRUPPE)drawWeibergruppe(a);
     else if(a.type===ACT.STAMMKUNDIN)drawStammkundin(a);
     else if(a.type===ACT.POSTBOTE)drawPostbote(a);
@@ -878,14 +957,25 @@ function drawMia(){
   cx.beginPath();cx.arc(x+(mia.dir>0?11:-11),y-26,4,0,Math.PI*2);cx.fill();
   cx.beginPath();cx.arc(x+(mia.dir>0?-11:11),y-26+walk*0.3,4,0,Math.PI*2);cx.fill();
 
-  // Carried items
-  if(mia.carrying.length>0){
-    for(let ci=0;ci<Math.min(mia.carrying.length,3);ci++){
-      const itm=items.find(i=>i.id===mia.carrying[ci]);
-      if(itm){
-        drawItem(x+(mia.dir>0?14:-14),y-30-ci*22,RACK_COLS[itm.rack],false);
-      }
-    }
+  // Carried item over shoulder
+  const carriedItem=items.find(i=>i.carriedBy==='mia');
+  if(carriedItem){
+    // Shoulder position: over the raised (back) arm
+    const sx=x+(mia.dir>0?-16:16);
+    const sy=y-52;
+    // Hanger hook
+    cx.strokeStyle='#aaa';cx.lineWidth=2;
+    cx.beginPath();cx.moveTo(sx,sy-4);cx.arc(sx,sy-1,5,Math.PI*1.5,Math.PI*0.5,false);cx.stroke();
+    // Garment rect hanging from hanger
+    cx.fillStyle=RACK_COLS[carriedItem.rack];cx.globalAlpha=0.92;
+    cx.fillRect(sx-9,sy-1,18,20);
+    // Sleeve nubs
+    cx.fillRect(sx-13,sy,6,8);
+    cx.fillRect(sx+7,sy,6,8);
+    cx.globalAlpha=1;
+    // Shine
+    cx.fillStyle='rgba(255,255,255,0.35)';
+    cx.fillRect(sx-6,sy+2,5,7);
   }
 
   // Neck
