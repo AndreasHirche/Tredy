@@ -62,7 +62,7 @@ canvas{display:block;touch-action:none}
 </div>
 
 <div id="ui">
-  <span id="ui-score">💰 0</span>
+  <span id="ui-score">💶 0€</span>
   <span id="ui-msg"></span>
   <span id="ui-level">Level 1</span>
 </div>
@@ -98,7 +98,7 @@ let msgText='',msgTimer=0;
 
 function msg(t,dur=180){msgText=t;msgTimer=dur;}
 function uiMsg(t){document.getElementById('ui-msg').textContent=t;}
-function uiScore(){document.getElementById('ui-score').textContent='💰 '+score+'€';}
+function uiScore(){document.getElementById('ui-score').textContent='💶 '+score+'€';}
 function uiLevel(){document.getElementById('ui-level').textContent='Level '+level;}
 
 // ── Layout constants ──────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ const RACK_XS=[RACK1_X,RACK2_X,RACK3_X,RACK4_X];
 let items=[];
 let nextItemId=0;
 function makeItem(rack,x,y){
-  return{id:nextItemId++,rack,x,y,hanging:true,carriedBy:null,misplaced:false};
+  return{id:nextItemId++,rack,x,y,col:RACK_COLS[rack],hanging:true,carriedBy:null,misplaced:false};
 }
 function initItems(){
   items=[];
@@ -321,9 +321,11 @@ function pickAndSort(item,destRack){
 }
 
 function sortOne(r){
+  // Pick the misplaced item NEAREST to Tiffany's current position
   const bad=items.filter(i=>i.hanging&&i.misplaced&&Math.abs(i.x-RACK_XS[r])<80);
   if(!bad.length){msg('✅ Alles korrekt sortiert!',70);return;}
-  pickAndSort(bad[0],bad[0].rack);
+  const nearest=bad.sort((a,b)=>Math.abs(a.x-mia.x)-Math.abs(b.x-mia.x))[0];
+  pickAndSort(nearest,nearest.rack);
 }
 
 // ── Action logic ──────────────────────────────────────────────────────────────
@@ -768,7 +770,7 @@ function drawItems(){
     if(isActionable(item.x)){
       drawGlowHalo(item.x,item.y+10,28);
     }
-    drawItem(item.x,item.hanging?item.y:item.y,RACK_COLS[item.rack],item.misplaced);
+    drawItem(item.x,item.hanging?item.y:item.y,item.col,item.misplaced);
   }
 }
 
@@ -855,7 +857,7 @@ function drawStammkundin(a){
   if(a.items.length>0){
     for(let ci=0;ci<Math.min(a.items.length,3);ci++){
       const itm=items.find(i=>i.id===a.items[ci]);
-      const col=itm?RACK_COLS[itm.rack]:'#c060a0';
+      const col=itm?(itm.col||RACK_COLS[itm.rack]):'#c060a0';
       const ox=ci*(a.dir>0?8:-8);
       drawCarriedItem(a.x+ox,a.y,a.dir,col);
     }
@@ -990,7 +992,7 @@ function drawMia(){
     cx.strokeStyle='#aaa';cx.lineWidth=2;
     cx.beginPath();cx.moveTo(sx,sy-4);cx.arc(sx,sy-1,5,Math.PI*1.5,Math.PI*0.5,false);cx.stroke();
     // Garment rect hanging from hanger
-    cx.fillStyle=RACK_COLS[carriedItem.rack];cx.globalAlpha=0.92;
+    cx.fillStyle=carriedItem.col||RACK_COLS[carriedItem.rack];cx.globalAlpha=0.92;
     cx.fillRect(sx-9,sy-1,18,20);
     // Sleeve nubs
     cx.fillRect(sx-13,sy,6,8);
