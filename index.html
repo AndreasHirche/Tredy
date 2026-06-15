@@ -437,7 +437,11 @@ function updateWeibergruppe(a){
         const wrongRack=(item.rack+1+Math.floor(Math.random()*3))%4;
         item.x=RACK_XS[wrongRack]+(Math.random()-0.5)*40;
         item.misplaced=true;
-        a.lastMovedItem=item.id;
+        // Rotate through members so each one shows a different item
+        if(!a.memberItems)a.memberItems=[null,null,null];
+        const slot=(a.chaosItemCount||0)%3;
+        a.memberItems[slot]=item.id;
+        a.chaosItemCount=(a.chaosItemCount||0)+1;
         msg('👩‍👩‍👧 Chaos an der Kleiderstange!',90);
       }
     }
@@ -785,19 +789,22 @@ function drawItems(){
 
 function drawItem(x,y,col,mis){
   // Hanger
-  cx.strokeStyle=mis?'#e00':'#888';cx.lineWidth=1.5;
+  cx.strokeStyle='#888';cx.lineWidth=1.5;
   cx.beginPath();cx.moveTo(x,y);cx.arc(x,y+3,5,Math.PI*1.5,Math.PI*0.5,false);cx.stroke();
-  // Garment
-  cx.fillStyle=col;cx.globalAlpha=0.85;
+  // Garment — always original colour, no tinting
+  cx.fillStyle=col;cx.globalAlpha=0.88;
   cx.fillRect(x-8,y+3,16,18);
-  if(mis){
-    cx.fillStyle='#e00';cx.globalAlpha=0.4;
-    cx.fillRect(x-8,y+3,16,18);
-  }
   cx.globalAlpha=1;
   // Shine
-  cx.fillStyle='rgba(255,255,255,0.3)';
-  cx.fillRect(x-5,y+5,5,6);
+  cx.fillStyle='rgba(255,255,255,0.3)';cx.fillRect(x-5,y+5,5,6);
+  // Misplaced: red border only (no fill change)
+  if(mis){
+    cx.strokeStyle='#e00';cx.lineWidth=2;
+    cx.strokeRect(x-8,y+3,16,18);
+    // Small ! badge
+    cx.fillStyle='#e00';cx.font='bold 8px sans-serif';cx.textAlign='center';
+    cx.fillText('!',x+10,y+3);cx.textAlign='left';
+  }
 }
 
 function drawPackages(){
@@ -830,17 +837,17 @@ function drawActors(){
 }
 
 function drawWeibergruppe(a){
+  // Assign carried items to members (one per member, cycling through lastMoved)
+  const memberItems=a.memberItems||[];
   a.members.forEach((m,i)=>{
     const x=a.x+m.dx;
     drawPerson(x,a.y,['#e8a0b8','#b0d8f0','#b8e8b0'][i],a.dir,'W',14+i*2);
-    // Show last moved item over shoulder during chaos
-    if(a.state==='chaos'&&a.lastMovedItem){
-      const itm=items.find(ii=>ii.id===a.lastMovedItem);
-      if(itm&&i===1){ // middle member carries it
-        drawCarriedItem(x,a.y,a.dir,itm.col||RACK_COLS[itm.rack]);
-      }
+    // Each member shows their own carried item
+    if(a.state==='chaos'&&memberItems[i]){
+      const itm=items.find(ii=>ii.id===memberItems[i]);
+      if(itm) drawCarriedItem(x,a.y,a.dir,itm.col);
     }
-    // speech bubble
+    // speech bubble on middle member
     if(a.state==='chaos'&&frame%40<20&&i===1){
       drawBubble(x,a.y-70,'🗣️ Schnatter!',80);
     }
