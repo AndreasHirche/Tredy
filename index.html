@@ -320,6 +320,7 @@ function hangItemOnRack(item,rackIndex){
 function payCustomer(a){
   if(a.state!=='waiting')return;
   const rev=a.items.length*15;score+=rev;uiScore();
+  addScorePopup(COUNTER_X,mia.y-50,rev);
   msg('💳 '+a.name+' zahlt '+rev+'€! Super Tiffany!',180);
   a.items.forEach(iid=>{const idx=items.findIndex(i=>i.id===iid);if(idx>=0)items.splice(idx,1);});
   // Restock after delay — spawn directly on rack, no flying animation
@@ -732,6 +733,7 @@ function draw(){
     cx.textAlign='left';
   }
   drawTapRipples();
+  drawScorePopups();
 
   cx.restore();
 }
@@ -1190,9 +1192,26 @@ function drawMia(){
   }
 }
 
-function drawScorePopups(){/* disabled */}
+function drawScorePopups(){
+  for(let i=scorePopups.length-1;i>=0;i--){
+    const p=scorePopups[i]; p.t++;
+    const prog=p.t/p.maxT;
+    if(prog>1){scorePopups.splice(i,1);continue;}
+    const y=p.y-prog*55;
+    const alpha=prog<0.5?1:1-(prog-0.5)/0.5;
+    cx.save();
+    cx.globalAlpha=alpha;
+    cx.shadowColor='#f0c040'; cx.shadowBlur=8;
+    cx.fillStyle='#f0c040';
+    cx.font='bold '+Math.max(10,Math.round(18*(1-prog*0.3)))+'px Georgia,serif';
+    cx.textAlign='center';
+    cx.fillText(p.val,p.x,y);
+    cx.restore();
+    if(p.t>=p.maxT)scorePopups.splice(i,1);
+  }
+}
 
-function addScorePopup(x,y,val){}
+function addScorePopup(x,y,val){if(val>0)scorePopups.push({x,y,val:'+'+val+'€',t:0,maxT:80});}
 
 function drawTapRipples(){
   for(const r of tapRipples){
