@@ -1052,12 +1052,6 @@ function drawPerson(x,y,col,dir,label,headR){
   cx.fillStyle='rgba(240,100,100,0.25)';
   cx.beginPath();cx.arc(x-headR*0.55,y-53+bob,headR*0.3,0,Math.PI*2);cx.fill();
   cx.beginPath();cx.arc(x+headR*0.55,y-53+bob,headR*0.3,0,Math.PI*2);cx.fill();
-  // Name tag above
-  const tw=cx.measureText(label).width+8;
-  cx.fillStyle='rgba(255,255,255,0.85)';
-  cx.beginPath();cx.roundRect(x-tw/2,y-75+bob,tw,13,4);cx.fill();
-  cx.fillStyle='#333';cx.font='bold 11px sans-serif';cx.textAlign='center';
-  cx.fillText(label,x,y-65+bob);cx.textAlign='left';
 }
 
 function drawBubble(x,y,text,w){
