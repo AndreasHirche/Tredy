@@ -1369,7 +1369,7 @@ function musicTick(){
   setTimeout(musicTick,100);
 }
 
-function startMusic(){
+function startMusic(){if(!_musicEnabled)return;
   if(_musicOn)return;
   const a=getAC();
   if(a.state==='suspended')a.resume();
@@ -1396,64 +1396,84 @@ function togglePause(){
 
 
 // ── Sound effects ────────────────────────────────────────────────────────────
-function getAC2(){return ac();} // reuse music AudioContext
+// ── Audio controls ───────────────────────────────────────────────────────────
+let _sfxEnabled=true, _musicEnabled=true;
+let _sfxAC=null;
+
+function getSfxAC(){
+  if(!_sfxAC||_sfxAC.state==='closed'){
+    _sfxAC=new(window.AudioContext||window.webkitAudioContext)();
+  }
+  if(_sfxAC.state==='suspended') _sfxAC.resume();
+  return _sfxAC;
+}
+
+function toggleMusic(){
+  _musicEnabled=!_musicEnabled;
+  const btn=document.getElementById('music-btn');
+  if(_musicEnabled){startMusic();if(btn)btn.textContent='🎵';}
+  else{stopMusic();if(btn)btn.textContent='🔇';}
+}
+function toggleSFX(){
+  _sfxEnabled=!_sfxEnabled;
+  const btn=document.getElementById('sfx-btn');
+  if(btn)btn.textContent=_sfxEnabled?'🔊':'🔈';
+}
 
 function soundDingDong(){
+  if(!_sfxEnabled)return;
   try{
-    const a=getAC2(); const t=a.currentTime;
-    // "Ding" — high bell
-    function bell(freq,start,dur,vol){
+    const a=getSfxAC(); const t=a.currentTime;
+    function bell(freq,when,dur,vol){
       const o=a.createOscillator(),g=a.createGain();
       o.type='sine';o.frequency.value=freq;
       o.connect(g);g.connect(a.destination);
-      g.gain.setValueAtTime(0,start);
-      g.gain.linearRampToValueAtTime(vol,start+0.01);
-      g.gain.exponentialRampToValueAtTime(0.001,start+dur);
-      o.start(start);o.stop(start+dur+0.05);
-      // Add slight overtone for bell quality
+      g.gain.setValueAtTime(0,when);
+      g.gain.linearRampToValueAtTime(vol,when+0.015);
+      g.gain.exponentialRampToValueAtTime(0.001,when+dur);
+      o.start(when);o.stop(when+dur+0.05);
       const o2=a.createOscillator(),g2=a.createGain();
       o2.type='sine';o2.frequency.value=freq*2.756;
       o2.connect(g2);g2.connect(a.destination);
-      g2.gain.setValueAtTime(0,start);
-      g2.gain.linearRampToValueAtTime(vol*0.3,start+0.01);
-      g2.gain.exponentialRampToValueAtTime(0.001,start+dur*0.5);
-      o2.start(start);o2.stop(start+dur);
+      g2.gain.setValueAtTime(0,when);
+      g2.gain.linearRampToValueAtTime(vol*0.25,when+0.01);
+      g2.gain.exponentialRampToValueAtTime(0.001,when+dur*0.4);
+      o2.start(when);o2.stop(when+dur);
     }
-    bell(880,t,0.8,0.22);      // Ding
-    bell(698,t+0.45,0.9,0.18); // Dong
-  }catch(e){}
+    bell(880,t,0.9,0.3);
+    bell(698,t+0.5,1.0,0.25);
+  }catch(e){console.warn('dingdong',e);}
 }
 
 function soundKaChing(){
+  if(!_sfxEnabled)return;
   try{
-    const a=getAC2(); const t=a.currentTime;
-    // Cash register bell: sharp metallic hit + coin shimmer
-    function metalHit(freq,start,dur,vol){
+    const a=getSfxAC(); const t=a.currentTime;
+    // Mechanical clunk
+    const buf=a.createBuffer(1,Math.floor(a.sampleRate*0.1),a.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(a.sampleRate*0.018));
+    const src=a.createBufferSource();src.buffer=buf;
+    const lp=a.createBiquadFilter();lp.type='lowpass';lp.frequency.value=500;
+    const gKa=a.createGain();gKa.gain.value=0.7;
+    src.connect(lp);lp.connect(gKa);gKa.connect(a.destination);
+    src.start(t);
+    // Bright metallic "ching"
+    function ching(freq,when,dur,vol){
       const o=a.createOscillator(),g=a.createGain();
       o.type='triangle';o.frequency.value=freq;
       o.connect(g);g.connect(a.destination);
-      g.gain.setValueAtTime(vol,start);
-      g.gain.exponentialRampToValueAtTime(0.001,start+dur);
-      o.start(start);o.stop(start+dur+0.02);
+      g.gain.setValueAtTime(vol,when);
+      g.gain.exponentialRampToValueAtTime(0.001,when+dur);
+      o.start(when);o.stop(when+dur+0.02);
     }
-    // "Ka" — drawer thud
-    const buf=a.createBuffer(1,Math.floor(a.sampleRate*0.08),a.sampleRate);
-    const d=buf.getChannelData(0);
-    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(a.sampleRate*0.015));
-    const src=a.createBufferSource(); src.buffer=buf;
-    const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=400;
-    const gn=a.createGain(); gn.gain.value=0.5;
-    src.connect(lp);lp.connect(gn);gn.connect(a.destination);
-    src.start(t);
-    // "Ching" — bright register bell
-    metalHit(1480,t+0.08,0.6,0.28);
-    metalHit(1760,t+0.10,0.5,0.18);
-    metalHit(2093,t+0.13,0.4,0.10);
-    // Coin shimmer
-    for(let i=0;i<6;i++){
-      metalHit(1200+i*180,t+0.08+i*0.03,0.25,0.06);
-    }
-  }catch(e){}
+    ching(1760,t+0.07,0.5,0.4);
+    ching(2217,t+0.09,0.4,0.3);
+    ching(2637,t+0.11,0.35,0.2);
+    ching(3136,t+0.13,0.3,0.15);
+    // Coin tinkle
+    for(let i=0;i<5;i++) ching(1400+i*200,t+0.07+i*0.025,0.2,0.08);
+  }catch(e){console.warn('kaching',e);}
 }
 
 function startGame(){
