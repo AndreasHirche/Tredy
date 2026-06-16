@@ -320,7 +320,6 @@ function hangItemOnRack(item,rackIndex){
 function payCustomer(a){
   if(a.state!=='waiting')return;
   const rev=a.items.length*15;score+=rev;uiScore();
-  addScorePopup(COUNTER_X,mia.y-60,rev);
   msg('💳 '+a.name+' zahlt '+rev+'€! Super Tiffany!',180);
   a.items.forEach(iid=>{const idx=items.findIndex(i=>i.id===iid);if(idx>=0)items.splice(idx,1);});
   // Restock: new items drift in from door position after a delay
@@ -1206,28 +1205,9 @@ function drawMia(){
   }
 }
 
-function drawScorePopups(){
-  for(let i=scorePopups.length-1;i>=0;i--){
-    const p=scorePopups[i];p.t++;
-    const prog=Math.min(p.t/p.maxT,1);
-    // simply float upward and fade — no DOM queries
-    const y=p.y-prog*60;
-    const alpha=prog<0.6?1:1-(prog-0.6)/0.4;
-    const sz=Math.max(8,Math.round(16*(1-prog*0.3)));
-    cx.save();
-    cx.globalAlpha=alpha;
-    cx.fillStyle='#f0c040';
-    cx.font='bold '+sz+'px Georgia,serif';
-    cx.textAlign='center';
-    cx.fillText(p.val,p.x,y);
-    cx.restore();
-    if(p.t>=p.maxT)scorePopups.splice(i,1);
-  }
-}
+function drawScorePopups(){/* disabled */}
 
-function addScorePopup(x,y,val){
-  scorePopups.push({x,y,val:'+'+val+'€',t:0,maxT:90});
-}
+function addScorePopup(x,y,val){}
 
 function drawTapRipples(){
   for(const r of tapRipples){
