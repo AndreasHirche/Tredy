@@ -85,15 +85,22 @@ function resize(){
   const vw=window.innerWidth,vh=window.innerHeight;
   const landscape=vw>vh;
   if(landscape){
-    // Fill full viewport — stretch canvas to cover everything
-    SCALE=Math.max(vw/DESIGN_W, vh/DESIGN_H);
+    // Scale to fill full width exactly
+    SCALE=vw/DESIGN_W;
+    const scaledH=DESIGN_H*SCALE;
+    cv.width=Math.round(DESIGN_W*SCALE);
+    cv.height=Math.round(scaledH);
+    // If canvas is taller than viewport, shift it up so bottom 80% is visible
+    // (the action is in the lower portion of the game)
+    const overflow=scaledH-vh;
+    const shift=overflow>0?Math.round(overflow*0.75):0; // show lower 75% of canvas
+    cv.style.cssText='display:block;width:'+cv.width+'px;height:'+cv.height+'px;margin:0;padding:0;position:relative;top:-'+shift+'px;';
   } else {
     SCALE=Math.min(vw/DESIGN_W,vh/DESIGN_H);
+    cv.width=Math.round(DESIGN_W*SCALE);
+    cv.height=Math.round(DESIGN_H*SCALE);
+    cv.style.cssText='display:block;width:'+cv.width+'px;height:'+cv.height+'px;margin:auto;';
   }
-  cv.width=Math.round(DESIGN_W*SCALE);
-  cv.height=Math.round(DESIGN_H*SCALE);
-  cv.style.cssText='display:block;width:'+cv.width+'px;height:'+cv.height+'px;margin:0;padding:0;';
-  // UI bar always overlay
   const ui=document.getElementById('ui');
   if(ui) ui.style.background='rgba(20,0,15,0.75)';
   W=DESIGN_W;H=DESIGN_H;
