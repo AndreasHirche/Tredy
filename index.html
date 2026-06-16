@@ -207,17 +207,17 @@ function spawnActor(){
       name:STAMM_NAMES[si],col:STAMM_COLS[si],
       prefRack:STAMM_LIKES[si],
       items:[],maxItems:3+Math.floor(Math.random()*3),
-      waitAtCounter:0,label:'👩'});
+      waitAtCounter:0,label:'👩'});soundDingDong();
   } else if(t===ACT.POSTBOTE){
     actors.push({id:nextActorId++,type:t,x:-40,y:FLOOR_Y,dir:1,speed:1.2,
       state:'enter',timer:0,phase:0,
       pkgCount:1,
       delivered:false,label:'📦',
-      happy:false,helpTimer:0});
+      happy:false,helpTimer:0});soundDingDong();
   } else if(t===ACT.MANAGEMENT){
     actors.push({id:nextActorId++,type:t,x:DOOR_X+30,y:FLOOR_Y,dir:-1,speed:1.0,
       state:'enter',timer:0,phase:0,
-      inspecting:false,inspectTimer:0,label:'👔'});
+      inspecting:false,inspectTimer:0,label:'👔'});soundDingDong();
   }
 }
 
@@ -587,7 +587,7 @@ function updateStammkundin(a){
 function updatePostbote(a){
   if(a.state==='enter'){
     a.x+=a.dir*a.speed;
-    if(a.x>120){a.state='deliver';a.timer=0;msg('📦 Postbote ist unterwegs!',90);}
+    if(a.x>120){a.state='deliver';a.timer=0;msg('📦 Postbote ist unterwegs!',90);soundDingDong();}
   }
   if(a.state==='deliver'){
     // Walk to counter
@@ -1392,6 +1392,71 @@ function togglePause(){
   paused=!paused;
   document.getElementById('btn-pause').textContent=paused?'Weiter':'Pause';
   if(paused) stopMusic(); else startMusic();
+}
+
+
+// ── Sound effects ────────────────────────────────────────────────────────────
+function getAC2(){
+  if(!window._ac2) window._ac2=new(window.AudioContext||window.webkitAudioContext)();
+  return window._ac2;
+}
+
+function soundDingDong(){
+  try{
+    const a=getAC2(); const t=a.currentTime;
+    // "Ding" — high bell
+    function bell(freq,start,dur,vol){
+      const o=a.createOscillator(),g=a.createGain();
+      o.type='sine';o.frequency.value=freq;
+      o.connect(g);g.connect(a.destination);
+      g.gain.setValueAtTime(0,start);
+      g.gain.linearRampToValueAtTime(vol,start+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001,start+dur);
+      o.start(start);o.stop(start+dur+0.05);
+      // Add slight overtone for bell quality
+      const o2=a.createOscillator(),g2=a.createGain();
+      o2.type='sine';o2.frequency.value=freq*2.756;
+      o2.connect(g2);g2.connect(a.destination);
+      g2.gain.setValueAtTime(0,start);
+      g2.gain.linearRampToValueAtTime(vol*0.3,start+0.01);
+      g2.gain.exponentialRampToValueAtTime(0.001,start+dur*0.5);
+      o2.start(start);o2.stop(start+dur);
+    }
+    bell(880,t,0.8,0.22);      // Ding
+    bell(698,t+0.45,0.9,0.18); // Dong
+  }catch(e){}
+}
+
+function soundKaChing(){
+  try{
+    const a=getAC2(); const t=a.currentTime;
+    // Cash register bell: sharp metallic hit + coin shimmer
+    function metalHit(freq,start,dur,vol){
+      const o=a.createOscillator(),g=a.createGain();
+      o.type='triangle';o.frequency.value=freq;
+      o.connect(g);g.connect(a.destination);
+      g.gain.setValueAtTime(vol,start);
+      g.gain.exponentialRampToValueAtTime(0.001,start+dur);
+      o.start(start);o.stop(start+dur+0.02);
+    }
+    // "Ka" — drawer thud
+    const buf=a.createBuffer(1,Math.floor(a.sampleRate*0.08),a.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(a.sampleRate*0.015));
+    const src=a.createBufferSource(); src.buffer=buf;
+    const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=400;
+    const gn=a.createGain(); gn.gain.value=0.5;
+    src.connect(lp);lp.connect(gn);gn.connect(a.destination);
+    src.start(t);
+    // "Ching" — bright register bell
+    metalHit(1480,t+0.08,0.6,0.28);
+    metalHit(1760,t+0.10,0.5,0.18);
+    metalHit(2093,t+0.13,0.4,0.10);
+    // Coin shimmer
+    for(let i=0;i<6;i++){
+      metalHit(1200+i*180,t+0.08+i*0.03,0.25,0.06);
+    }
+  }catch(e){}
 }
 
 function startGame(){
