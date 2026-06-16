@@ -84,32 +84,18 @@ const DESIGN_W=800,DESIGN_H=500;
 function resize(){
   const vw=window.innerWidth,vh=window.innerHeight;
   const landscape=vw>vh;
-  // In landscape: scale to fill full width; in portrait: fit both dimensions
   if(landscape){
-    SCALE=vw/DESIGN_W;
-    // if that would make it taller than viewport, constrain by height
-    if(DESIGN_H*SCALE>vh) SCALE=vh/DESIGN_H;
+    // Fill full viewport — stretch canvas to cover everything
+    SCALE=Math.max(vw/DESIGN_W, vh/DESIGN_H);
   } else {
     SCALE=Math.min(vw/DESIGN_W,vh/DESIGN_H);
   }
   cv.width=Math.round(DESIGN_W*SCALE);
   cv.height=Math.round(DESIGN_H*SCALE);
-  cv.style.width=cv.width+'px';
-  cv.style.height=cv.height+'px';
-  cv.style.display='block';
-  cv.style.margin='auto';
-  // In landscape: position UI bar over canvas to reclaim space
+  cv.style.cssText='display:block;width:'+cv.width+'px;height:'+cv.height+'px;margin:0;padding:0;';
+  // UI bar always overlay
   const ui=document.getElementById('ui');
-  if(ui){
-    if(landscape){
-      ui.style.position='absolute';
-      ui.style.top='0';
-      ui.style.background='rgba(20,0,15,0.72)';
-    } else {
-      ui.style.position='fixed';
-      ui.style.background='rgba(20,0,15,0.82)';
-    }
-  }
+  if(ui) ui.style.background='rgba(20,0,15,0.75)';
   W=DESIGN_W;H=DESIGN_H;
 }
 window.addEventListener('resize',resize);
@@ -237,7 +223,7 @@ function screenToGame(cx2,cy2){
 }
 
 function handleTap(clientX,clientY){
-  if(paused&&state===ST.PLAY){paused=false;document.getElementById('btn-pause').textContent='Pause';return;}
+  if(paused&&state===ST.PLAY){paused=false;document.getElementById('btn-pause').textContent='Pause';startMusic();return;}
   if(state!==ST.PLAY)return;
   const g=screenToGame(clientX,clientY);
   tapRipples.push({x:g.x,y:g.y,t:0});
@@ -1015,35 +1001,60 @@ function drawManagement(a){
 }
 
 function drawPerson(x,y,col,dir,label,headR){
-  const walk=Math.sin(frame*0.2)*3;
+  const walk=Math.sin(frame*0.22)*4;
+  const bob=Math.abs(Math.sin(frame*0.22))*2;
   // Shadow
-  cx.fillStyle='rgba(0,0,0,0.12)';cx.beginPath();
-  cx.ellipse(x,y+2,12,4,0,0,Math.PI*2);cx.fill();
-  // Legs
-  cx.fillStyle='#333';
-  cx.fillRect(x-5,y-18,5,18);
-  cx.fillRect(x+1,y-18+Math.abs(walk),5,18-Math.abs(walk));
-  // Shoes
-  cx.fillStyle='#1a1a1a';
-  cx.fillRect(x-6,y-3,8,4);cx.fillRect(x,y-3,8,4);
-  // Body
-  cx.fillStyle=col;cx.fillRect(x-9,y-42,18,26);
-  // Arms
+  cx.fillStyle='rgba(0,0,0,0.18)';cx.beginPath();
+  cx.ellipse(x,y+2,13,4,0,0,Math.PI*2);cx.fill();
+  // Shoes — rounder and cuter
+  cx.fillStyle='#2a1a0a';
+  cx.beginPath();cx.ellipse(x-4+walk*0.3,y-1,7,4,0.15,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.ellipse(x+5-walk*0.3,y-1+Math.abs(walk)*0.2,7,4,-0.15,0,Math.PI*2);cx.fill();
+  // Legs with slight swing
+  cx.fillStyle='#222';
+  cx.beginPath();cx.roundRect(x-6,y-20+walk*0.3,5,20,2);cx.fill();
+  cx.beginPath();cx.roundRect(x+2,y-20-walk*0.3,5,20,2);cx.fill();
+  // Body — slightly rounded
   cx.fillStyle=col;
-  cx.fillRect(x+(dir>0?8:-14),y-40,6,16);
-  cx.fillRect(x+(dir>0?-14:8),y-40+walk,6,14);
-  // Head
+  cx.beginPath();cx.roundRect(x-10,y-44+bob,20,26,4);cx.fill();
+  // Collar detail
+  cx.fillStyle='rgba(255,255,255,0.2)';
+  cx.beginPath();cx.arc(x,y-44+bob,5,0,Math.PI);cx.fill();
+  // Arms with swing
+  const armSwing=walk*0.5;
+  cx.fillStyle=col;
+  cx.beginPath();cx.roundRect(x+(dir>0?9:-14),y-42+bob-armSwing,5,16,2);cx.fill();
+  cx.beginPath();cx.roundRect(x+(dir>0?-14:9),y-42+bob+armSwing,5,16,2);cx.fill();
+  // Hands
+  cx.fillStyle='#f0c898';
+  cx.beginPath();cx.arc(x+(dir>0?11:-12),y-27+bob-armSwing,3.5,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.arc(x+(dir>0?-12:11),y-27+bob+armSwing,3.5,0,Math.PI*2);cx.fill();
+  // Neck
+  cx.fillStyle='#f0c898';cx.fillRect(x-3,y-48+bob,6,6);
+  // Head — bigger, rounder
   cx.fillStyle='#f0c898';cx.beginPath();
-  cx.arc(x,y-48,headR,0,Math.PI*2);cx.fill();
-  // Hair — use label as simple indicator
-  cx.fillStyle='#4a1a00';cx.beginPath();
-  cx.arc(x,y-52,headR*0.85,Math.PI,0);cx.fill();
-  // Eyes
-  cx.fillStyle='#1a1a1a';
-  cx.fillRect(x+dir*2,y-50,2,2);
-  // Label tag
-  cx.fillStyle='rgba(0,0,0,0.5)';cx.font='bold 8px sans-serif';cx.textAlign='center';
-  cx.fillText(label,x,y-70);cx.textAlign='left';
+  cx.arc(x,y-54+bob,headR+1,0,Math.PI*2);cx.fill();
+  // Hair
+  cx.fillStyle='#3a1000';cx.beginPath();
+  cx.arc(x,y-58+bob,headR*0.9,Math.PI,0);cx.fill();
+  // Cute eyes with highlights
+  cx.fillStyle='#1a0a00';
+  cx.beginPath();cx.arc(x+dir*3,y-55+bob,2.5,0,Math.PI*2);cx.fill();
+  cx.fillStyle='white';
+  cx.beginPath();cx.arc(x+dir*3+1,y-56+bob,0.9,0,Math.PI*2);cx.fill();
+  // Smile
+  cx.strokeStyle='#a04030';cx.lineWidth=1.2;
+  cx.beginPath();cx.arc(x,y-51+bob,3,0.2,Math.PI-0.2);cx.stroke();
+  // Rosy cheeks
+  cx.fillStyle='rgba(240,100,100,0.25)';
+  cx.beginPath();cx.arc(x-headR*0.55,y-53+bob,headR*0.3,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.arc(x+headR*0.55,y-53+bob,headR*0.3,0,Math.PI*2);cx.fill();
+  // Name tag above
+  const tw=cx.measureText(label).width+8;
+  cx.fillStyle='rgba(255,255,255,0.85)';
+  cx.beginPath();cx.roundRect(x-tw/2,y-75+bob,tw,13,4);cx.fill();
+  cx.fillStyle='#333';cx.font='bold 7px sans-serif';cx.textAlign='center';
+  cx.fillText(label,x,y-65+bob);cx.textAlign='left';
 }
 
 function drawBubble(x,y,text,w){
@@ -1372,6 +1383,7 @@ function togglePause(){
   if(state!==ST.PLAY)return;
   paused=!paused;
   document.getElementById('btn-pause').textContent=paused?'Weiter':'Pause';
+  if(paused) stopMusic(); else startMusic();
 }
 
 function startGame(){
