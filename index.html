@@ -321,7 +321,7 @@ function hangItemOnRack(item,rackIndex){
 function payCustomer(a){
   if(a.state!=='waiting')return;
   const rev=a.items.length*15;score+=rev;uiScore();
-  addScorePopup(COUNTER_X,mia.y-50,rev);
+  addScorePopup(COUNTER_X,mia.y-50,rev);soundKaChing();
   msg('💳 '+a.name+' zahlt '+rev+'€! Super Tiffany!',180);
   a.items.forEach(iid=>{const idx=items.findIndex(i=>i.id===iid);if(idx>=0)items.splice(idx,1);});
   const soldCount=a.items.length;
@@ -1396,10 +1396,7 @@ function togglePause(){
 
 
 // ── Sound effects ────────────────────────────────────────────────────────────
-function getAC2(){
-  if(!window._ac2) window._ac2=new(window.AudioContext||window.webkitAudioContext)();
-  return window._ac2;
-}
+function getAC2(){return ac();} // reuse music AudioContext
 
 function soundDingDong(){
   try{
