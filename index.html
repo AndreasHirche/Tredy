@@ -324,8 +324,10 @@ function payCustomer(a){
   addScorePopup(COUNTER_X,mia.y-50,rev);
   msg('💳 '+a.name+' zahlt '+rev+'€! Super Tiffany!',180);
   a.items.forEach(iid=>{const idx=items.findIndex(i=>i.id===iid);if(idx>=0)items.splice(idx,1);});
+  const soldCount=a.items.length;
+  a.items=[]; // clear immediately so nothing draws over shoulder
   // Restock after delay — spawn directly on rack, no flying animation
-  const restockCount=a.items.length;
+  const restockCount=soldCount;
   setTimeout(()=>{
     for(let n=0;n<restockCount;n++){
       const r=Math.floor(Math.random()*4);
