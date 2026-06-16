@@ -1207,22 +1207,20 @@ function drawMia(){
 }
 
 function drawScorePopups(){
-  const uiRect=document.getElementById('ui-score').getBoundingClientRect();
-  const targetX=(uiRect.left+uiRect.right)/2/SCALE;
-  const targetY=uiRect.bottom/SCALE;
   for(let i=scorePopups.length-1;i>=0;i--){
     const p=scorePopups[i];p.t++;
-    const prog=p.t/p.maxT;
-    // fly from spawn point toward score display
-    const x=p.x+(targetX-p.x)*prog*prog;
-    const y=p.y-(p.y-targetY)*prog;
-    const alpha=prog<0.7?1:1-(prog-0.7)/0.3;
-    const sz=Math.round(16*(1-prog*0.4));
+    const prog=Math.min(p.t/p.maxT,1);
+    // simply float upward and fade — no DOM queries
+    const y=p.y-prog*60;
+    const alpha=prog<0.6?1:1-(prog-0.6)/0.4;
+    const sz=Math.max(8,Math.round(16*(1-prog*0.3)));
+    cx.save();
     cx.globalAlpha=alpha;
-    cx.fillStyle='#f0c040';cx.font='bold '+sz+'px Georgia,serif';
+    cx.fillStyle='#f0c040';
+    cx.font='bold '+sz+'px Georgia,serif';
     cx.textAlign='center';
-    cx.fillText(p.val,x,y);
-    cx.textAlign='left';cx.globalAlpha=1;
+    cx.fillText(p.val,p.x,y);
+    cx.restore();
     if(p.t>=p.maxT)scorePopups.splice(i,1);
   }
 }
