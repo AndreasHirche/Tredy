@@ -962,7 +962,8 @@ function drawStammkundin(a){
   if(a.items.length>0){
     for(let ci=0;ci<Math.min(a.items.length,3);ci++){
       const itm=items.find(i=>i.id===a.items[ci]);
-      const col=itm?(itm.origCol||itm.col||RACK_COLS[itm.rack]):'#c060a0';
+      if(!itm)continue; // item already sold/removed — don't draw
+      const col=itm.origCol||itm.col||RACK_COLS[itm.rack];
       const ox=ci*(a.dir>0?8:-8);
       drawCarriedItem(a.x+ox,a.y,a.dir,col);
     }
