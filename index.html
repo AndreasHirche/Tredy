@@ -315,6 +315,7 @@ function hangItemOnRack(item,rackIndex){
   item.x=RACK_XS[rackIndex]+(Math.random()-0.5)*40;
   item.y=RACK_Y+10;
   item.misplaced=(item.rack!==rackIndex);
+  soundClick();
   // item.rack never changes — it always means 'correct rack'
   if(!item.misplaced){score+=5;uiScore();msg('✅ Richtig einsortiert! +5',70);}
   else{msg('⚠️ Falsche Stange – kommt falsch hin!',90);}
@@ -358,6 +359,7 @@ function openPackage(pkg){
 function pickAndSort(item,destRack){
   if(item.carriedBy!=null)return;
   item.hanging=false;
+  soundClick();
   if(!item.col)item.col=RACK_COLS[item.rack]; // ensure col set
   item.carriedBy='mia';
   const rx=RACK_XS[destRack];
@@ -492,7 +494,7 @@ function updateWeibergruppe(a){
         (nearX(i.x,RACK1_X,70)||nearX(i.x,RACK2_X,70)||nearX(i.x,RACK3_X,70)||nearX(i.x,RACK4_X,70)));
       if(rackItems.length>0){
         const item=rackItems[Math.floor(Math.random()*rackItems.length)];
-        item.hanging=false;item.carriedBy='weib';
+        item.hanging=false;item.carriedBy='weib';soundClick();
         const wrongRack=(item.rack+1+Math.floor(Math.random()*3))%4;
         // Assign to a member
         if(!a.memberItems)a.memberItems=[null,null,null];
@@ -1445,6 +1447,26 @@ function soundDingDong(){
     bell(880,t,0.9,0.3);
     bell(698,t+0.5,1.0,0.25);
   }catch(e){console.warn('dingdong',e);}
+}
+
+function soundClick(){
+  if(!_sfxEnabled)return;
+  try{
+    const a=getSfxAC(); const t=a.currentTime;
+    // metallic click: short noise burst filtered high + brief ring
+    const buf=a.createBuffer(1,Math.floor(a.sampleRate*0.03),a.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length)*(i<3?i/3:1);
+    const src=a.createBufferSource();src.buffer=buf;
+    const hpf=a.createBiquadFilter();hpf.type='highpass';hpf.frequency.value=3000;
+    const g=a.createGain();g.gain.setValueAtTime(0.35,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.03);
+    src.connect(hpf);hpf.connect(g);g.connect(a.destination);src.start(t);
+    // short metallic ring
+    const o=a.createOscillator(),g2=a.createGain();
+    o.type='triangle';o.frequency.value=4200;
+    g2.gain.setValueAtTime(0.12,t+0.002);g2.gain.exponentialRampToValueAtTime(0.001,t+0.09);
+    o.connect(g2);g2.connect(a.destination);o.start(t+0.002);o.stop(t+0.1);
+  }catch(e){console.warn('click',e);}
 }
 
 function soundPop(){
